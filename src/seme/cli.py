@@ -79,10 +79,10 @@ def repl_loop(inp: TextIOBase, out: TextIOBase, err: TextIOBase) -> int:
             out.flush()
             return 0
 
-        source = line.strip()
-        if not source:
+        source = line.rstrip("\n")
+        if not source.strip():
             continue
-        if source == ":quit":
+        if source.strip() == ":quit":
             return 0
 
         tokens, lex_diags = lex(source)

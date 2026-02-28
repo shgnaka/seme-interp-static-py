@@ -43,3 +43,11 @@ def test_run_execute_runtime_error() -> None:
     assert stdout == "1\n"
     assert diags
     assert diags[0].code == "RUNTIME-001"
+
+
+def test_run_execute_print_in_value_context_is_type_error() -> None:
+    source = "print(1) == print(2);"
+    stdout, diags = run_execute(source)
+    assert stdout == ""
+    assert diags
+    assert diags[0].code == "TYPE-008"

@@ -75,14 +75,21 @@ def test_parse_let_without_initializer() -> None:
     assert stmt.initializer is None
 
 
-def test_parse_const_with_annotation_without_initializer() -> None:
+def test_parse_error_const_requires_initializer() -> None:
     program, diags = parse_source("const s: string;")
-    assert diags == []
-    assert len(program.statements) == 1
-    stmt = program.statements[0]
-    assert stmt.name == "s"
-    assert stmt.type_name == "string"
-    assert stmt.initializer is None
+    assert program is not None
+    assert len(diags) >= 1
+    assert diags[0].code == "PARSE-001"
+    assert "Expected '=' and initializer in const declaration" in diags[0].message
+
+
+def test_parse_error_const_requires_initializer_in_for_init() -> None:
+    source = "for (const i: int; i < 3; i = i + 1) { print(i); }"
+    program, diags = parse_source(source)
+    assert program is not None
+    assert len(diags) >= 1
+    assert diags[0].code == "PARSE-001"
+    assert "Expected '=' and initializer in const declaration" in diags[0].message
 
 
 def test_parse_error_recovery_collects_multiple_errors() -> None:

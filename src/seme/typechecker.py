@@ -31,7 +31,6 @@ TYPE_INT: TypeName = "int"
 TYPE_BOOL: TypeName = "bool"
 TYPE_STRING: TypeName = "string"
 TYPE_UNKNOWN = "<unknown>"
-TYPE_VOID = "<void>"
 
 
 @dataclass
@@ -113,6 +112,9 @@ class TypeChecker:
             self._pop_scope()
             return
         if isinstance(stmt, ExprStmt):
+            if isinstance(stmt.expression, Call) and self._is_print_call(stmt.expression):
+                self._check_print_stmt(stmt.expression)
+                return
             self._check_expr(stmt.expression)
             return
 
@@ -274,12 +276,13 @@ class TypeChecker:
             return TYPE_UNKNOWN
 
         if isinstance(expr, Call):
-            if isinstance(expr.callee, Identifier) and expr.callee.name == "print":
+            if self._is_print_call(expr):
                 for arg in expr.arguments:
                     self._check_expr(arg)
                 if len(expr.arguments) != 1:
                     self._diag("TYPE-008", "print requires exactly one argument", expr.line, expr.column)
-                return TYPE_VOID
+                self._diag("TYPE-008", "print(expr) can only appear as a statement", expr.line, expr.column)
+                return TYPE_UNKNOWN
 
             self._check_expr(expr.callee)
             for arg in expr.arguments:
@@ -296,6 +299,15 @@ class TypeChecker:
             self._diag("TYPE-002", f"Redeclaration of '{name}' in same scope", line, column)
             return
         current[name] = symbol
+
+    def _is_print_call(self, expr: Expr) -> bool:
+        return isinstance(expr, Call) and isinstance(expr.callee, Identifier) and expr.callee.name == "print"
+
+    def _check_print_stmt(self, call: Call) -> None:
+        for arg in call.arguments:
+            self._check_expr(arg)
+        if len(call.arguments) != 1:
+            self._diag("TYPE-008", "print requires exactly one argument", call.line, call.column)
 
     def _resolve(self, name: str) -> Symbol | None:
         for scope in reversed(self.scopes):

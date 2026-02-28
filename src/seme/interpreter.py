@@ -25,12 +25,14 @@ from seme.diagnostics import Diagnostic
 from seme.token import TokenKind
 
 RuntimeValue = int | bool | str
+EvalValue = RuntimeValue | object
 _UNINITIALIZED = object()
+_VOID = object()
 
 
 @dataclass
 class RuntimeBinding:
-    value: RuntimeValue | object
+    value: EvalValue
     is_const: bool
 
 
@@ -81,7 +83,11 @@ class Interpreter:
             else:
                 self._declare(
                     stmt.name,
-                    self._eval_expr(stmt.initializer),
+                    self._require_runtime_value(
+                        self._eval_expr(stmt.initializer),
+                        stmt.initializer.line,
+                        stmt.initializer.column,
+                    ),
                     is_const=False,
                     line=stmt.line,
                     column=stmt.column,
@@ -94,7 +100,11 @@ class Interpreter:
             else:
                 self._declare(
                     stmt.name,
-                    self._eval_expr(stmt.initializer),
+                    self._require_runtime_value(
+                        self._eval_expr(stmt.initializer),
+                        stmt.initializer.line,
+                        stmt.initializer.column,
+                    ),
                     is_const=True,
                     line=stmt.line,
                     column=stmt.column,
@@ -102,12 +112,20 @@ class Interpreter:
             return
 
         if isinstance(stmt, Assign):
-            value = self._eval_expr(stmt.value)
+            value = self._require_runtime_value(
+                self._eval_expr(stmt.value),
+                stmt.value.line,
+                stmt.value.column,
+            )
             self._assign(stmt.name, value, stmt.line, stmt.column)
             return
 
         if isinstance(stmt, If):
-            cond = self._eval_expr(stmt.condition)
+            cond = self._require_runtime_value(
+                self._eval_expr(stmt.condition),
+                stmt.condition.line,
+                stmt.condition.column,
+            )
             if not isinstance(cond, bool):
                 self._runtime_error(stmt.condition.line, stmt.condition.column, "if condition must evaluate to bool")
             if cond:
@@ -118,7 +136,11 @@ class Interpreter:
 
         if isinstance(stmt, While):
             while True:
-                cond = self._eval_expr(stmt.condition)
+                cond = self._require_runtime_value(
+                    self._eval_expr(stmt.condition),
+                    stmt.condition.line,
+                    stmt.condition.column,
+                )
                 if not isinstance(cond, bool):
                     self._runtime_error(
                         stmt.condition.line,
@@ -141,7 +163,11 @@ class Interpreter:
 
                 while True:
                     if stmt.condition is not None:
-                        cond = self._eval_expr(stmt.condition)
+                        cond = self._require_runtime_value(
+                            self._eval_expr(stmt.condition),
+                            stmt.condition.line,
+                            stmt.condition.column,
+                        )
                         if not isinstance(cond, bool):
                             self._runtime_error(
                                 stmt.condition.line,
@@ -173,7 +199,7 @@ class Interpreter:
             self._eval_expr(stmt.expression)
             return
 
-    def _eval_expr(self, expr: Expr) -> RuntimeValue:
+    def _eval_expr(self, expr: Expr) -> EvalValue:
         if isinstance(expr, Literal):
             return expr.value
 
@@ -184,7 +210,11 @@ class Interpreter:
             return self._eval_expr(expr.expression)
 
         if isinstance(expr, Unary):
-            operand = self._eval_expr(expr.operand)
+            operand = self._require_runtime_value(
+                self._eval_expr(expr.operand),
+                expr.operand.line,
+                expr.operand.column,
+            )
             if expr.operator == TokenKind.BANG:
                 if not isinstance(operand, bool):
                     self._runtime_error(expr.line, expr.column, "operator '!' requires bool operand")
@@ -197,29 +227,53 @@ class Interpreter:
 
         if isinstance(expr, Binary):
             if expr.operator == TokenKind.ANDAND:
-                left = self._eval_expr(expr.left)
+                left = self._require_runtime_value(
+                    self._eval_expr(expr.left),
+                    expr.left.line,
+                    expr.left.column,
+                )
                 if not isinstance(left, bool):
                     self._runtime_error(expr.line, expr.column, "operator '&&' requires bool operands")
                 if not left:
                     return False
-                right = self._eval_expr(expr.right)
+                right = self._require_runtime_value(
+                    self._eval_expr(expr.right),
+                    expr.right.line,
+                    expr.right.column,
+                )
                 if not isinstance(right, bool):
                     self._runtime_error(expr.line, expr.column, "operator '&&' requires bool operands")
                 return left and right
 
             if expr.operator == TokenKind.OROR:
-                left = self._eval_expr(expr.left)
+                left = self._require_runtime_value(
+                    self._eval_expr(expr.left),
+                    expr.left.line,
+                    expr.left.column,
+                )
                 if not isinstance(left, bool):
                     self._runtime_error(expr.line, expr.column, "operator '||' requires bool operands")
                 if left:
                     return True
-                right = self._eval_expr(expr.right)
+                right = self._require_runtime_value(
+                    self._eval_expr(expr.right),
+                    expr.right.line,
+                    expr.right.column,
+                )
                 if not isinstance(right, bool):
                     self._runtime_error(expr.line, expr.column, "operator '||' requires bool operands")
                 return left or right
 
-            left = self._eval_expr(expr.left)
-            right = self._eval_expr(expr.right)
+            left = self._require_runtime_value(
+                self._eval_expr(expr.left),
+                expr.left.line,
+                expr.left.column,
+            )
+            right = self._require_runtime_value(
+                self._eval_expr(expr.right),
+                expr.right.line,
+                expr.right.column,
+            )
             op = expr.operator
 
             if op in (TokenKind.PLUS, TokenKind.MINUS, TokenKind.STAR, TokenKind.SLASH, TokenKind.PERCENT):
@@ -262,9 +316,13 @@ class Interpreter:
                 self._runtime_error(expr.line, expr.column, "only print(expr) call is supported")
             if len(expr.arguments) != 1:
                 self._runtime_error(expr.line, expr.column, "print requires exactly one argument")
-            value = self._eval_expr(expr.arguments[0])
+            value = self._require_runtime_value(
+                self._eval_expr(expr.arguments[0]),
+                expr.arguments[0].line,
+                expr.arguments[0].column,
+            )
             self.stdout_lines.append(self._format_value(value))
-            return 0
+            return _VOID
 
         self._runtime_error(expr.line, expr.column, "unsupported expression")
 
@@ -314,6 +372,11 @@ class Interpreter:
 
     def _is_int(self, value: RuntimeValue) -> bool:
         return isinstance(value, int) and not isinstance(value, bool)
+
+    def _require_runtime_value(self, value: EvalValue, line: int, column: int) -> RuntimeValue:
+        if value is _VOID:
+            self._runtime_error(line, column, "expression does not produce a value")
+        return value  # type: ignore[return-value]
 
 
 def eval_program(program: Program) -> tuple[list[str], list[Diagnostic]]:

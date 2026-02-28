@@ -59,6 +59,11 @@ def test_type008_invalid_call_shape() -> None:
     assert "TYPE-008" in found
 
 
+def test_type008_print_is_statement_only() -> None:
+    diagnostics = check_source("print(1) == print(2); let x = print(3);")
+    assert "TYPE-008" in codes(diagnostics)
+
+
 def test_collects_multiple_type_errors() -> None:
     diagnostics = check_source("let x; x = true; if (1) { const c = 1; c = 2; }")
     found = codes(diagnostics)

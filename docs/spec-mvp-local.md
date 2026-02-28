@@ -65,7 +65,7 @@ statement    = let_decl
              | block
              | expr_stmt ;
 
-let_decl     = "let" identifier [ ":" type ] "=" expression ";" ;
+let_decl     = "let" identifier [ ":" type ] [ "=" expression ] ";" ;
 const_decl   = "const" identifier [ ":" type ] "=" expression ";" ;
 assign_stmt  = identifier "=" expression ";" ;
 expr_stmt    = expression ";" ;
@@ -76,7 +76,7 @@ while_stmt   = "while" "(" expression ")" statement ;
 for_stmt     = "for" "(" [ for_init ] ";" [ expression ] ";" [ expression ] ")" statement ;
 for_init     = let_decl_no_semi | const_decl_no_semi | assign_no_semi | expression ;
 
-let_decl_no_semi   = "let" identifier [ ":" type ] "=" expression ;
+let_decl_no_semi   = "let" identifier [ ":" type ] [ "=" expression ] ;
 const_decl_no_semi = "const" identifier [ ":" type ] "=" expression ;
 assign_no_semi     = identifier "=" expression ;
 
@@ -121,7 +121,8 @@ type         = "int" | "bool" | "string" ;
 
 - `let` は再代入可能
 - `const` は再代入不可
-- 型注釈なし・初期化なし宣言は禁止（`TYPE-001`）
+- `let` は型注釈または初期化式のどちらか必須（両方なしは `TYPE-001`）
+- `const` は初期化式が必須
 
 ### 5.4 Expression Constraints
 
@@ -149,6 +150,7 @@ type         = "int" | "bool" | "string" ;
 - 環境はスコープスタックで管理
 - `for` は `init -> condition -> body -> update` 順に評価
 - 組み込み: `print(expr);` は評価結果を1行出力
+- `print(expr)` は文としてのみ使用可能で、値を返さない
 
 ### 6.1 Exit Codes
 
