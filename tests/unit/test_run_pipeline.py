@@ -38,8 +38,8 @@ def test_run_execute_lex_error_blocks_runtime() -> None:
 
 
 def test_run_execute_runtime_error() -> None:
-    source = "let x = 10 / 0; print(x);"
+    source = "print(1); let x = 10 / 0; print(x);"
     stdout, diags = run_execute(source)
-    assert stdout == ""
+    assert stdout == "1\n"
     assert diags
     assert diags[0].code == "RUNTIME-001"
