@@ -31,9 +31,9 @@ def run_execute(source: str) -> tuple[str, list[Diagnostic]]:
         return "", type_diags
 
     stdout_lines, runtime_diags = eval_program(program)
+    stdout_text = ""
+    if stdout_lines:
+        stdout_text = "\n".join(stdout_lines) + "\n"
     if runtime_diags:
-        return "", runtime_diags
-
-    if not stdout_lines:
-        return "", []
-    return "\n".join(stdout_lines) + "\n", []
+        return stdout_text, runtime_diags
+    return stdout_text, []
