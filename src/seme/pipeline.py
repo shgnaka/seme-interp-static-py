@@ -11,3 +11,4 @@ def run_check(source: str) -> list[Diagnostic]:
         return lex_diags
     _, parse_diags = parse(tokens)
     return parse_diags
+

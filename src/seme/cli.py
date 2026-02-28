@@ -52,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if args.command == "repl":
         print("RUNTIME-001 1:1 'repl' is not implemented in Phase 2", file=sys.stderr)
+
         return 1
 
     parser.print_help()
