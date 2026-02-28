@@ -4,22 +4,22 @@ from dataclasses import dataclass
 
 from seme.ast import (
     Assign,
-    BinaryExpr,
-    BlockStmt,
-    CallExpr,
+    Binary,
+    Block,
+    Call,
     ConstDecl,
     Expr,
     ExprStmt,
-    ForStmt,
-    GroupingExpr,
-    IdentifierExpr,
-    IfStmt,
+    For,
+    Grouping,
+    Identifier,
+    If,
     LetDecl,
-    LiteralExpr,
+    Literal,
     Program,
     Stmt,
-    UnaryExpr,
-    WhileStmt,
+    Unary,
+    While,
 )
 from seme.diagnostics import Diagnostic
 from seme.token import Token, TokenKind
@@ -55,6 +55,15 @@ class Parser:
                 statements.append(self._parse_statement())
             except ParseError:
                 self._synchronize()
+        if statements:
+            return (
+                Program(
+                    statements=statements,
+                    line=statements[0].line,
+                    column=statements[0].column,
+                ),
+                self.diagnostics,
+            )
         return Program(statements=statements), self.diagnostics
 
     def _parse_statement(self) -> Stmt:
@@ -122,7 +131,7 @@ class Parser:
             self._consume(TokenKind.SEMI, "Expected ';' after assignment")
         return Assign(name=ident.lexeme, value=value, line=ident.line, column=ident.column)
 
-    def _parse_if_stmt(self, if_tok: Token) -> IfStmt:
+    def _parse_if_stmt(self, if_tok: Token) -> If:
         self._consume(TokenKind.LPAREN, "Expected '(' after 'if'")
         condition = self._parse_expression()
         self._consume(TokenKind.RPAREN, "Expected ')' after if condition")
@@ -130,7 +139,7 @@ class Parser:
         else_branch: Stmt | None = None
         if self._match(TokenKind.ELSE):
             else_branch = self._parse_statement()
-        return IfStmt(
+        return If(
             condition=condition,
             then_branch=then_branch,
             else_branch=else_branch,
@@ -138,14 +147,14 @@ class Parser:
             column=if_tok.column,
         )
 
-    def _parse_while_stmt(self, while_tok: Token) -> WhileStmt:
+    def _parse_while_stmt(self, while_tok: Token) -> While:
         self._consume(TokenKind.LPAREN, "Expected '(' after 'while'")
         condition = self._parse_expression()
         self._consume(TokenKind.RPAREN, "Expected ')' after while condition")
         body = self._parse_statement()
-        return WhileStmt(condition=condition, body=body, line=while_tok.line, column=while_tok.column)
+        return While(condition=condition, body=body, line=while_tok.line, column=while_tok.column)
 
-    def _parse_for_stmt(self, for_tok: Token) -> ForStmt:
+    def _parse_for_stmt(self, for_tok: Token) -> For:
         self._consume(TokenKind.LPAREN, "Expected '(' after 'for'")
 
         init: Stmt | Expr | None = None
@@ -173,7 +182,7 @@ class Parser:
                 update = self._parse_expression()
         self._consume(TokenKind.RPAREN, "Expected ')' after for clauses")
         body = self._parse_statement()
-        return ForStmt(
+        return For(
             init=init,
             condition=condition,
             update=update,
@@ -182,7 +191,7 @@ class Parser:
             column=for_tok.column,
         )
 
-    def _parse_block(self, lbrace: Token) -> BlockStmt:
+    def _parse_block(self, lbrace: Token) -> Block:
         statements: list[Stmt] = []
         while not self._check(TokenKind.RBRACE) and not self._at_end():
             try:
@@ -190,12 +199,12 @@ class Parser:
             except ParseError:
                 self._synchronize()
         self._consume(TokenKind.RBRACE, "Expected '}' after block")
-        return BlockStmt(statements=statements, line=lbrace.line, column=lbrace.column)
+        return Block(statements=statements, line=lbrace.line, column=lbrace.column)
 
     def _parse_expr_stmt(self) -> ExprStmt:
         expr = self._parse_expression()
-        end = self._consume(TokenKind.SEMI, "Expected ';' after expression statement")
-        return ExprStmt(expression=expr, line=end.line, column=end.column)
+        self._consume(TokenKind.SEMI, "Expected ';' after expression statement")
+        return ExprStmt(expression=expr, line=expr.line, column=expr.column)
 
     def _parse_expression(self, min_prec: int = PREC_OR) -> Expr:
         left = self._parse_prefix()
@@ -209,7 +218,7 @@ class Parser:
                 left = self._finish_call(left, op)
                 continue
             right = self._parse_expression(prec + 1)
-            left = BinaryExpr(
+            left = Binary(
                 left=left,
                 operator=op.kind,
                 right=right,
@@ -221,20 +230,20 @@ class Parser:
     def _parse_prefix(self) -> Expr:
         tok = self._advance()
         if tok.kind == TokenKind.INT_LIT:
-            return LiteralExpr(value=int(tok.lexeme), line=tok.line, column=tok.column)
+            return Literal(value=int(tok.lexeme), line=tok.line, column=tok.column)
         if tok.kind == TokenKind.STRING_LIT:
-            return LiteralExpr(value=tok.lexeme, line=tok.line, column=tok.column)
+            return Literal(value=tok.lexeme, line=tok.line, column=tok.column)
         if tok.kind == TokenKind.BOOL_LIT:
-            return LiteralExpr(value=(tok.lexeme == "true"), line=tok.line, column=tok.column)
+            return Literal(value=(tok.lexeme == "true"), line=tok.line, column=tok.column)
         if tok.kind == TokenKind.IDENT:
-            return IdentifierExpr(name=tok.lexeme, line=tok.line, column=tok.column)
+            return Identifier(name=tok.lexeme, line=tok.line, column=tok.column)
         if tok.kind in (TokenKind.BANG, TokenKind.MINUS):
             operand = self._parse_expression(PREC_UNARY)
-            return UnaryExpr(operator=tok.kind, operand=operand, line=tok.line, column=tok.column)
+            return Unary(operator=tok.kind, operand=operand, line=tok.line, column=tok.column)
         if tok.kind == TokenKind.LPAREN:
             expr = self._parse_expression(PREC_OR)
             self._consume(TokenKind.RPAREN, "Expected ')' after grouped expression")
-            return GroupingExpr(expression=expr, line=tok.line, column=tok.column)
+            return Grouping(expression=expr, line=tok.line, column=tok.column)
         raise self._error(tok, f"Unexpected token {self._render_token(tok)} in expression")
 
     def _finish_call(self, callee: Expr, lparen: Token) -> Expr:
@@ -245,7 +254,7 @@ class Parser:
                 if not self._match(TokenKind.COMMA):
                     break
         self._consume(TokenKind.RPAREN, "Expected ')' after call arguments")
-        return CallExpr(callee=callee, arguments=args, line=lparen.line, column=lparen.column)
+        return Call(callee=callee, arguments=args, line=lparen.line, column=lparen.column)
 
     def _infix_precedence(self, kind: TokenKind) -> int:
         if kind == TokenKind.LPAREN:
