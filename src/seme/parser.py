@@ -86,13 +86,14 @@ class Parser:
     def _parse_let_decl(self, let_tok: Token, require_semi: bool) -> LetDecl:
         ident = self._consume(TokenKind.IDENT, "Expected identifier after 'let'")
         type_name: str | None = None
+        initializer: Expr | None = None
         if self._match(TokenKind.COLON):
             type_tok = self._consume(TokenKind.IDENT, "Expected type name after ':'")
             if type_tok.lexeme not in SUPPORTED_TYPES:
                 raise self._error(type_tok, f"Unknown type '{type_tok.lexeme}'")
             type_name = type_tok.lexeme
-        self._consume(TokenKind.ASSIGN, "Expected '=' in let declaration")
-        initializer = self._parse_expression()
+        if self._match(TokenKind.ASSIGN):
+            initializer = self._parse_expression()
         if require_semi:
             self._consume(TokenKind.SEMI, "Expected ';' after let declaration")
         return LetDecl(
@@ -106,13 +107,14 @@ class Parser:
     def _parse_const_decl(self, const_tok: Token, require_semi: bool) -> ConstDecl:
         ident = self._consume(TokenKind.IDENT, "Expected identifier after 'const'")
         type_name: str | None = None
+        initializer: Expr | None = None
         if self._match(TokenKind.COLON):
             type_tok = self._consume(TokenKind.IDENT, "Expected type name after ':'")
             if type_tok.lexeme not in SUPPORTED_TYPES:
                 raise self._error(type_tok, f"Unknown type '{type_tok.lexeme}'")
             type_name = type_tok.lexeme
-        self._consume(TokenKind.ASSIGN, "Expected '=' in const declaration")
-        initializer = self._parse_expression()
+        if self._match(TokenKind.ASSIGN):
+            initializer = self._parse_expression()
         if require_semi:
             self._consume(TokenKind.SEMI, "Expected ';' after const declaration")
         return ConstDecl(

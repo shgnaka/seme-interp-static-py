@@ -15,7 +15,7 @@ class Program:
 @dataclass(frozen=True)
 class LetDecl:
     name: str
-    initializer: "Expr"
+    initializer: "Expr | None"
     type_name: str | None
     line: int
     column: int
@@ -24,7 +24,7 @@ class LetDecl:
 @dataclass(frozen=True)
 class ConstDecl:
     name: str
-    initializer: "Expr"
+    initializer: "Expr | None"
     type_name: str | None
     line: int
     column: int

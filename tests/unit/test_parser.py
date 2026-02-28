@@ -65,6 +65,26 @@ def test_parse_error_missing_semicolon() -> None:
     assert "Expected ';' after let declaration" in diags[0].message
 
 
+def test_parse_let_without_initializer() -> None:
+    program, diags = parse_source("let x;")
+    assert diags == []
+    assert len(program.statements) == 1
+    stmt = program.statements[0]
+    assert isinstance(stmt, LetDecl)
+    assert stmt.type_name is None
+    assert stmt.initializer is None
+
+
+def test_parse_const_with_annotation_without_initializer() -> None:
+    program, diags = parse_source("const s: string;")
+    assert diags == []
+    assert len(program.statements) == 1
+    stmt = program.statements[0]
+    assert stmt.name == "s"
+    assert stmt.type_name == "string"
+    assert stmt.initializer is None
+
+
 def test_parse_error_recovery_collects_multiple_errors() -> None:
     source = "let a = ;\nlet b = 1\nlet c = 2;"
     program, diags = parse_source(source)
