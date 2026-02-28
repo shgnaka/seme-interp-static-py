@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "seme-interp-static-py"
-version = "0.1.0"
-description = "MVP lexer-first implementation for seme."
+version = "0.2.0"
+description = "MVP lexer+parser implementation for seme."
 readme = "docs/README.md"
 requires-python = ">=3.11"
 authors = [{ name = "seme-interp-static-py" }]
