@@ -39,7 +39,7 @@ class Assign:
 
 
 @dataclass(frozen=True)
-class IfStmt:
+class If:
     condition: "Expr"
     then_branch: "Stmt"
     else_branch: "Stmt | None"
@@ -48,7 +48,7 @@ class IfStmt:
 
 
 @dataclass(frozen=True)
-class WhileStmt:
+class While:
     condition: "Expr"
     body: "Stmt"
     line: int
@@ -56,7 +56,7 @@ class WhileStmt:
 
 
 @dataclass(frozen=True)
-class ForStmt:
+class For:
     init: "Stmt | Expr | None"
     condition: "Expr | None"
     update: "Expr | Assign | None"
@@ -66,7 +66,7 @@ class ForStmt:
 
 
 @dataclass(frozen=True)
-class BlockStmt:
+class Block:
     statements: list["Stmt"]
     line: int
     column: int
@@ -80,7 +80,7 @@ class ExprStmt:
 
 
 @dataclass(frozen=True)
-class BinaryExpr:
+class Binary:
     left: "Expr"
     operator: TokenKind
     right: "Expr"
@@ -89,7 +89,7 @@ class BinaryExpr:
 
 
 @dataclass(frozen=True)
-class UnaryExpr:
+class Unary:
     operator: TokenKind
     operand: "Expr"
     line: int
@@ -97,33 +97,75 @@ class UnaryExpr:
 
 
 @dataclass(frozen=True)
-class LiteralExpr:
+class Literal:
     value: int | str | bool
     line: int
     column: int
 
 
 @dataclass(frozen=True)
-class IdentifierExpr:
+class Identifier:
     name: str
     line: int
     column: int
 
 
 @dataclass(frozen=True)
-class GroupingExpr:
+class Grouping:
     expression: "Expr"
     line: int
     column: int
 
 
 @dataclass(frozen=True)
-class CallExpr:
+class Call:
     callee: "Expr"
     arguments: list["Expr"]
     line: int
     column: int
 
 
-Stmt = LetDecl | ConstDecl | Assign | IfStmt | WhileStmt | ForStmt | BlockStmt | ExprStmt
-Expr = BinaryExpr | UnaryExpr | LiteralExpr | IdentifierExpr | GroupingExpr | CallExpr
+Stmt = LetDecl | ConstDecl | Assign | If | While | For | Block | ExprStmt
+Expr = Binary | Unary | Literal | Identifier | Grouping | Call
+
+# Backward-compat aliases for earlier Phase 2 naming.
+IfStmt = If
+WhileStmt = While
+ForStmt = For
+BlockStmt = Block
+BinaryExpr = Binary
+UnaryExpr = Unary
+LiteralExpr = Literal
+IdentifierExpr = Identifier
+GroupingExpr = Grouping
+CallExpr = Call
+
+__all__ = [
+    "Program",
+    "LetDecl",
+    "ConstDecl",
+    "Assign",
+    "If",
+    "While",
+    "For",
+    "Block",
+    "ExprStmt",
+    "Binary",
+    "Unary",
+    "Literal",
+    "Identifier",
+    "Grouping",
+    "Call",
+    "Stmt",
+    "Expr",
+    "IfStmt",
+    "WhileStmt",
+    "ForStmt",
+    "BlockStmt",
+    "BinaryExpr",
+    "UnaryExpr",
+    "LiteralExpr",
+    "IdentifierExpr",
+    "GroupingExpr",
+    "CallExpr",
+]
