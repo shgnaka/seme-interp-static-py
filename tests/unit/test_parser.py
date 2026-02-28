@@ -78,18 +78,33 @@ def test_parse_let_without_initializer() -> None:
 def test_parse_error_const_requires_initializer() -> None:
     program, diags = parse_source("const s: string;")
     assert program is not None
-    assert len(diags) >= 1
-    assert diags[0].code == "PARSE-001"
-    assert "Expected '=' and initializer in const declaration" in diags[0].message
+    assert len(diags) == 1
+    diag = diags[0]
+    assert diag.code == "PARSE-001"
+    assert "Expected '=' and initializer in const declaration" in diag.message
+    assert diag.line == 1
+    assert diag.column == 16
 
 
 def test_parse_error_const_requires_initializer_in_for_init() -> None:
     source = "for (const i: int; i < 3; i = i + 1) { print(i); }"
     program, diags = parse_source(source)
     assert program is not None
-    assert len(diags) >= 1
-    assert diags[0].code == "PARSE-001"
-    assert "Expected '=' and initializer in const declaration" in diags[0].message
+    assert len(diags) == 1
+    diag = diags[0]
+    assert diag.code == "PARSE-001"
+    assert "Expected '=' and initializer in const declaration" in diag.message
+    assert diag.line == 1
+    assert diag.column == 18
+
+
+def test_parse_for_init_error_recovers_and_keeps_following_statement() -> None:
+    source = "for (const i: int; i < 3; i = i + 1) { print(i); }\nlet x = 1;"
+    program, diags = parse_source(source)
+    assert len(diags) == 1
+    assert isinstance(program.statements[0], ForStmt)
+    assert isinstance(program.statements[1], LetDecl)
+    assert program.statements[1].name == "x"
 
 
 def test_parse_error_recovery_collects_multiple_errors() -> None:

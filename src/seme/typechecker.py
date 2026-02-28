@@ -281,6 +281,7 @@ class TypeChecker:
                     self._check_expr(arg)
                 if len(expr.arguments) != 1:
                     self._diag("TYPE-008", "print requires exactly one argument", expr.line, expr.column)
+                    return TYPE_UNKNOWN
                 self._diag("TYPE-008", "print(expr) can only appear as a statement", expr.line, expr.column)
                 return TYPE_UNKNOWN
 

@@ -63,3 +63,14 @@ def test_repl_runtime_error_does_not_corrupt_session_state() -> None:
     assert "RUNTIME-001" in err.getvalue()
     assert out.getvalue().count("1\n") == 1
     assert "99\n" not in out.getvalue()
+
+
+def test_repl_preserves_column_with_leading_spaces() -> None:
+    inp = StringIO("   @\n:quit\n")
+    out = StringIO()
+    err = StringIO()
+
+    code = repl_loop(inp, out, err)
+
+    assert code == 0
+    assert "LEX-001 1:4" in err.getvalue()

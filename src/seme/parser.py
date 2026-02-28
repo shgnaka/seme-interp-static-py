@@ -160,27 +160,36 @@ class Parser:
 
         init: Stmt | Expr | None = None
         if not self._check(TokenKind.SEMI):
-            if self._match(TokenKind.LET):
-                init = self._parse_let_decl(self._previous(), require_semi=False)
-            elif self._match(TokenKind.CONST):
-                init = self._parse_const_decl(self._previous(), require_semi=False)
-            elif self._check(TokenKind.IDENT) and self._check_next(TokenKind.ASSIGN):
-                init = self._parse_assign_stmt(require_semi=False)
-            else:
-                init = self._parse_expression()
+            try:
+                if self._match(TokenKind.LET):
+                    init = self._parse_let_decl(self._previous(), require_semi=False)
+                elif self._match(TokenKind.CONST):
+                    init = self._parse_const_decl(self._previous(), require_semi=False)
+                elif self._check(TokenKind.IDENT) and self._check_next(TokenKind.ASSIGN):
+                    init = self._parse_assign_stmt(require_semi=False)
+                else:
+                    init = self._parse_expression()
+            except ParseError:
+                self._recover_for_clause(TokenKind.SEMI)
         self._consume(TokenKind.SEMI, "Expected ';' after for-init")
 
         condition: Expr | None = None
         if not self._check(TokenKind.SEMI):
-            condition = self._parse_expression()
+            try:
+                condition = self._parse_expression()
+            except ParseError:
+                self._recover_for_clause(TokenKind.SEMI)
         self._consume(TokenKind.SEMI, "Expected ';' after for-condition")
 
         update: Expr | Assign | None = None
         if not self._check(TokenKind.RPAREN):
-            if self._check(TokenKind.IDENT) and self._check_next(TokenKind.ASSIGN):
-                update = self._parse_assign_stmt(require_semi=False)
-            else:
-                update = self._parse_expression()
+            try:
+                if self._check(TokenKind.IDENT) and self._check_next(TokenKind.ASSIGN):
+                    update = self._parse_assign_stmt(require_semi=False)
+                else:
+                    update = self._parse_expression()
+            except ParseError:
+                self._recover_for_clause(TokenKind.RPAREN)
         self._consume(TokenKind.RPAREN, "Expected ')' after for clauses")
         body = self._parse_statement()
         return For(
@@ -273,6 +282,10 @@ class Parser:
         if kind in (TokenKind.STAR, TokenKind.SLASH, TokenKind.PERCENT):
             return PREC_FACTOR
         return PREC_NONE
+
+    def _recover_for_clause(self, stop_at: TokenKind) -> None:
+        while not self._at_end() and not self._check(stop_at) and not self._check(TokenKind.RPAREN):
+            self._advance()
 
     def _synchronize(self) -> None:
         if self._at_end():

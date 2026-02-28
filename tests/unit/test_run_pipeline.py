@@ -49,5 +49,22 @@ def test_run_execute_print_in_value_context_is_type_error() -> None:
     source = "print(1) == print(2);"
     stdout, diags = run_execute(source)
     assert stdout == ""
-    assert diags
-    assert diags[0].code == "TYPE-008"
+    assert [
+        (d.code, d.message, d.line, d.column)
+        for d in diags
+    ] == [
+        ("TYPE-008", "print(expr) can only appear as a statement", 1, 6),
+        ("TYPE-008", "print(expr) can only appear as a statement", 1, 18),
+    ]
+
+
+def test_run_execute_print_bad_arity_in_value_context_is_single_type_error() -> None:
+    source = "let x = print();"
+    stdout, diags = run_execute(source)
+    assert stdout == ""
+    assert [
+        (d.code, d.message, d.line, d.column)
+        for d in diags
+    ] == [
+        ("TYPE-008", "print requires exactly one argument", 1, 14),
+    ]

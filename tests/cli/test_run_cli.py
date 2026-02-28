@@ -51,3 +51,29 @@ def test_run_runtime_error_keeps_partial_stdout(tmp_path: Path, capsys) -> None:
     assert code == 1
     assert captured.out == "1\n"
     assert "RUNTIME-001" in captured.err
+
+
+def test_run_const_requires_initializer_returns_parse_error(tmp_path: Path, capsys) -> None:
+    source_file = tmp_path / "const_no_init_run.seme"
+    source_file.write_text("const x: int;", encoding="utf-8")
+
+    code = main(["run", str(source_file)])
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert captured.out == ""
+    assert "PARSE-001 1:13" in captured.err
+    assert "Expected '=' and initializer in const declaration" in captured.err
+
+
+def test_run_print_in_value_context_returns_type008(tmp_path: Path, capsys) -> None:
+    source_file = tmp_path / "print_expr_ctx_run.seme"
+    source_file.write_text("print(1) == print(2);", encoding="utf-8")
+
+    code = main(["run", str(source_file)])
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert captured.out == ""
+    assert "TYPE-008 1:6 print(expr) can only appear as a statement" in captured.err
+    assert "TYPE-008 1:18 print(expr) can only appear as a statement" in captured.err

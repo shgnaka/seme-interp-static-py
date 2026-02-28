@@ -59,3 +59,27 @@ def test_check_lex_error_returns_one(tmp_path: Path, capsys) -> None:
 
     assert code == 1
     assert "LEX-001" in captured.err
+
+
+def test_check_const_requires_initializer_returns_parse_error(tmp_path: Path, capsys) -> None:
+    source_file = tmp_path / "const_no_init.seme"
+    source_file.write_text("const x: int;", encoding="utf-8")
+
+    code = main(["check", str(source_file)])
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert "PARSE-001 1:13" in captured.err
+    assert "Expected '=' and initializer in const declaration" in captured.err
+
+
+def test_check_print_in_value_context_returns_type008(tmp_path: Path, capsys) -> None:
+    source_file = tmp_path / "print_expr_ctx.seme"
+    source_file.write_text("print(1) == print(2);", encoding="utf-8")
+
+    code = main(["check", str(source_file)])
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert "TYPE-008 1:6 print(expr) can only appear as a statement" in captured.err
+    assert "TYPE-008 1:18 print(expr) can only appear as a statement" in captured.err

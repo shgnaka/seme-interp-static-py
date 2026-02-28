@@ -54,14 +54,34 @@ def test_type006_invalid_operator_operands() -> None:
 
 
 def test_type008_invalid_call_shape() -> None:
-    diagnostics = check_source("foo(1); print();")
-    found = codes(diagnostics)
-    assert "TYPE-008" in found
+    diagnostics = check_source("let foo = 1; foo(1); print();")
+    assert [
+        (d.code, d.message, d.line, d.column)
+        for d in diagnostics
+    ] == [
+        ("TYPE-008", "Only print(expr) call is supported", 1, 17),
+        ("TYPE-008", "print requires exactly one argument", 1, 27),
+    ]
 
 
 def test_type008_print_is_statement_only() -> None:
-    diagnostics = check_source("print(1) == print(2); let x = print(3);")
-    assert "TYPE-008" in codes(diagnostics)
+    diagnostics = check_source("let x = print(3);")
+    assert [
+        (d.code, d.message, d.line, d.column)
+        for d in diagnostics
+    ] == [
+        ("TYPE-008", "print(expr) can only appear as a statement", 1, 14),
+    ]
+
+
+def test_type008_print_bad_arity_in_expression_reports_single_diagnostic() -> None:
+    diagnostics = check_source("let x = print();")
+    assert [
+        (d.code, d.message, d.line, d.column)
+        for d in diagnostics
+    ] == [
+        ("TYPE-008", "print requires exactly one argument", 1, 14),
+    ]
 
 
 def test_collects_multiple_type_errors() -> None:
