@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import argparse
 import sys
+from io import TextIOBase
 from pathlib import Path
 
+from seme.ast import Program, Stmt
 from seme.diagnostics import Diagnostic
-from seme.pipeline import run_check
+from seme.interpreter import Interpreter
+from seme.lexer import lex
+from seme.parser import parse
+from seme.pipeline import run_check, run_execute
+from seme.typechecker import check_types
 
 
 def _format_diagnostic(diag: Diagnostic) -> str:
@@ -13,6 +19,11 @@ def _format_diagnostic(diag: Diagnostic) -> str:
     if diag.suggestion:
         return f"{base} (suggestion: {diag.suggestion})"
     return base
+
+
+def _print_diagnostics(diagnostics: list[Diagnostic], stream: TextIOBase) -> None:
+    for diag in diagnostics:
+        print(_format_diagnostic(diag), file=stream)
 
 
 def _cmd_check(file_path: str) -> int:
@@ -25,10 +36,108 @@ def _cmd_check(file_path: str) -> int:
 
     diagnostics = run_check(source)
     if diagnostics:
-        for diag in diagnostics:
-            print(_format_diagnostic(diag), file=sys.stderr)
+        _print_diagnostics(diagnostics, sys.stderr)
         return 1
     return 0
+
+
+def _cmd_run(file_path: str) -> int:
+    path = Path(file_path)
+    try:
+        source = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"RUNTIME-001 1:1 Failed to read file: {exc}", file=sys.stderr)
+        return 1
+
+    stdout_text, diagnostics = run_execute(source)
+    if stdout_text:
+        sys.stdout.write(stdout_text)
+    if diagnostics:
+        _print_diagnostics(diagnostics, sys.stderr)
+        return 1
+    return 0
+
+
+def _program_for_history(statements: list[Stmt]) -> Program:
+    if not statements:
+        return Program(statements=[])
+    first = statements[0]
+    return Program(statements=list(statements), line=first.line, column=first.column)
+
+
+def repl_loop(inp: TextIOBase, out: TextIOBase, err: TextIOBase) -> int:
+    history: list[Stmt] = []
+    interpreter = Interpreter()
+
+    while True:
+        out.write("seme> ")
+        out.flush()
+
+        line = inp.readline()
+        if line == "":
+            out.write("\n")
+            out.flush()
+            return 0
+
+        source = line.strip()
+        if not source:
+            continue
+        if source == ":quit":
+            return 0
+
+        tokens, lex_diags = lex(source)
+        if lex_diags:
+            _print_diagnostics(lex_diags, err)
+            continue
+
+        program, parse_diags = parse(tokens)
+        if parse_diags:
+            _print_diagnostics(parse_diags, err)
+            continue
+
+        if len(program.statements) != 1:
+            _print_diagnostics(
+                [
+                    Diagnostic(
+                        code="PARSE-001",
+                        message="REPL accepts exactly one statement per line",
+                        line=1,
+                        column=1,
+                    )
+                ],
+                err,
+            )
+            continue
+
+        stmt = program.statements[0]
+        type_diags = check_types(_program_for_history(history + [stmt]))
+        if type_diags:
+            _print_diagnostics(type_diags, err)
+            continue
+
+        stmt_program = Program(statements=[stmt], line=stmt.line, column=stmt.column)
+        stdout_lines, runtime_diags = interpreter.execute(stmt_program)
+        for runtime_line in stdout_lines:
+            out.write(f"{runtime_line}\n")
+        out.flush()
+
+        if runtime_diags:
+            _print_diagnostics(runtime_diags, err)
+
+            interpreter = Interpreter()
+            if history:
+                _, rebuild_diags = interpreter.execute(_program_for_history(history))
+                if rebuild_diags:
+                    _print_diagnostics(rebuild_diags, err)
+                    history = []
+                    interpreter = Interpreter()
+            continue
+
+        history.append(stmt)
+
+
+def _cmd_repl() -> int:
+    return repl_loop(sys.stdin, sys.stdout, sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -48,12 +157,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check":
         return _cmd_check(args.file)
     if args.command == "run":
-        print("RUNTIME-001 1:1 'run' is not implemented in Phase 5", file=sys.stderr)
-        return 1
+        return _cmd_run(args.file)
     if args.command == "repl":
-        print("RUNTIME-001 1:1 'repl' is not implemented in Phase 5", file=sys.stderr)
-
-        return 1
+        return _cmd_repl()
 
     parser.print_help()
     return 1

@@ -46,10 +46,33 @@ class Interpreter:
         self.scopes: list[dict[str, RuntimeBinding]] = [{}]
         self.stdout_lines: list[str] = []
 
-    def eval_program(self, program: Program) -> list[str]:
-        for stmt in program.statements:
-            self._eval_stmt(stmt)
-        return self.stdout_lines
+    def execute(self, program: Program) -> tuple[list[str], list[Diagnostic]]:
+        start_index = len(self.stdout_lines)
+        diagnostics: list[Diagnostic] = []
+        try:
+            for stmt in program.statements:
+                self._eval_stmt(stmt)
+            return self.stdout_lines[start_index:], diagnostics
+        except RuntimeFault as err:
+            diagnostics.append(
+                Diagnostic(
+                    code="RUNTIME-001",
+                    message=f"Runtime error: {err.message}",
+                    line=err.line,
+                    column=err.column,
+                )
+            )
+            return self.stdout_lines[start_index:], diagnostics
+        except Exception as exc:  # pragma: no cover
+            diagnostics.append(
+                Diagnostic(
+                    code="RUNTIME-001",
+                    message=f"Runtime error: {exc}",
+                    line=program.line,
+                    column=program.column,
+                )
+            )
+            return self.stdout_lines[start_index:], diagnostics
 
     def _eval_stmt(self, stmt: Stmt) -> None:
         if isinstance(stmt, LetDecl):
@@ -295,27 +318,4 @@ class Interpreter:
 
 def eval_program(program: Program) -> tuple[list[str], list[Diagnostic]]:
     interpreter = Interpreter()
-    diagnostics: list[Diagnostic] = []
-    try:
-        stdout_lines = interpreter.eval_program(program)
-        return stdout_lines, diagnostics
-    except RuntimeFault as err:
-        diagnostics.append(
-            Diagnostic(
-                code="RUNTIME-001",
-                message=f"Runtime error: {err.message}",
-                line=err.line,
-                column=err.column,
-            )
-        )
-        return interpreter.stdout_lines, diagnostics
-    except Exception as exc:  # pragma: no cover
-        diagnostics.append(
-            Diagnostic(
-                code="RUNTIME-001",
-                message=f"Runtime error: {exc}",
-                line=program.line,
-                column=program.column,
-            )
-        )
-        return interpreter.stdout_lines, diagnostics
+    return interpreter.execute(program)
