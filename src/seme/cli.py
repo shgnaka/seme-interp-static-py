@@ -48,10 +48,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check":
         return _cmd_check(args.file)
     if args.command == "run":
-        print("RUNTIME-001 1:1 'run' is not implemented in Phase 4", file=sys.stderr)
+        print("RUNTIME-001 1:1 'run' is not implemented in Phase 5", file=sys.stderr)
         return 1
     if args.command == "repl":
-        print("RUNTIME-001 1:1 'repl' is not implemented in Phase 4", file=sys.stderr)
+        print("RUNTIME-001 1:1 'repl' is not implemented in Phase 5", file=sys.stderr)
 
         return 1
 
