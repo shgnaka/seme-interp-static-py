@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "seme-interp-static-py"
+version = "0.2.0"
+description = "MVP lexer+parser implementation for seme."
+readme = "docs/README.md"
+requires-python = ">=3.11"
+authors = [{ name = "seme-interp-static-py" }]
+dependencies = []
+
+[project.scripts]
+seme = "seme.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,73 @@
+[
+  {
+    "name": "basic let",
+    "source": "let x = 1;",
+    "expected_token_kinds": ["LET", "IDENT", "ASSIGN", "INT_LIT", "SEMI"]
+  },
+  {
+    "name": "if true print",
+    "source": "if (true) { print(1); }",
+    "expected_token_kinds": [
+      "IF",
+      "LPAREN",
+      "BOOL_LIT",
+      "RPAREN",
+      "LBRACE",
+      "IDENT",
+      "LPAREN",
+      "INT_LIT",
+      "RPAREN",
+      "SEMI",
+      "RBRACE"
+    ]
+  },
+  {
+    "name": "comment skip",
+    "source": "let x = 1; // comment\nx = x + 1;",
+    "expected_token_kinds": [
+      "LET",
+      "IDENT",
+      "ASSIGN",
+      "INT_LIT",
+      "SEMI",
+      "IDENT",
+      "ASSIGN",
+      "IDENT",
+      "PLUS",
+      "INT_LIT",
+      "SEMI"
+    ]
+  },
+  {
+    "name": "multi operators",
+    "source": "a==b!=c<=d>=e&&f||g;",
+    "expected_token_kinds": [
+      "IDENT",
+      "EQEQ",
+      "IDENT",
+      "NEQ",
+      "IDENT",
+      "LTE",
+      "IDENT",
+      "GTE",
+      "IDENT",
+      "ANDAND",
+      "IDENT",
+      "OROR",
+      "IDENT",
+      "SEMI"
+    ]
+  },
+  {
+    "name": "invalid char",
+    "source": "@",
+    "expected_token_kinds": [],
+    "expected_diagnostics": [{"code": "LEX-001", "line": 1, "column": 1}]
+  },
+  {
+    "name": "unterminated string",
+    "source": "let s = \"abc",
+    "expected_token_kinds": ["LET", "IDENT", "ASSIGN"],
+    "expected_diagnostics": [{"code": "LEX-001", "line": 1, "column": 9}]
+  }
+]
