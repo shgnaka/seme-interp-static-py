@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from seme.ast import Assign, Binary, Block, Call, ConstDecl, Expr, ExprStmt, For, Grouping, Identifier, If, LetDecl, Literal, Program, Stmt, Unary, While
 from seme.bytecode import Chunk, LocalInfo, OpCode, SourceSpan
+from seme.runtime import RuntimeValue, make_runtime_value
 from seme.token import TokenKind
 
 
@@ -55,8 +56,11 @@ class BytecodeBuilder:
     def chunk(self) -> Chunk:
         return self.state.chunk
 
-    def add_constant(self, value: int | bool | str) -> int:
+    def add_constant(self, value: RuntimeValue) -> int:
         return self.chunk.add_constant(value)
+
+    def add_literal_constant(self, value: int | bool | str) -> int:
+        return self.add_constant(make_runtime_value(value))
 
     def emit(self, opcode: OpCode, *operands: int, span: SourceSpan) -> int:
         return self.chunk.emit(opcode, *operands, span=span)
@@ -177,7 +181,7 @@ class Compiler:
 
     def _compile_expr(self, expr: Expr) -> None:
         if isinstance(expr, Literal):
-            const_index = self.builder.add_constant(expr.value)
+            const_index = self.builder.add_literal_constant(expr.value)
             self.builder.emit(OpCode.LOAD_CONST, const_index, span=SourceSpan(expr.line, expr.column))
             return
 
@@ -226,13 +230,13 @@ class Compiler:
             self.builder.emit_jump(OpCode.JUMP, done_label, span=SourceSpan(expr.line, expr.column))
             self.builder.bind_label(short_circuit_label)
             self.builder.emit(OpCode.POP, span=SourceSpan(expr.line, expr.column))
-            false_index = self.builder.add_constant(False)
+            false_index = self.builder.add_literal_constant(False)
             self.builder.emit(OpCode.LOAD_CONST, false_index, span=SourceSpan(expr.line, expr.column))
             self.builder.bind_label(done_label)
             return
 
         self.builder.emit_jump(OpCode.JUMP_IF_FALSE, short_circuit_label, span=SourceSpan(expr.line, expr.column))
-        true_index = self.builder.add_constant(True)
+        true_index = self.builder.add_literal_constant(True)
         self.builder.emit(OpCode.POP, span=SourceSpan(expr.line, expr.column))
         self.builder.emit(OpCode.LOAD_CONST, true_index, span=SourceSpan(expr.line, expr.column))
         self.builder.emit_jump(OpCode.JUMP, done_label, span=SourceSpan(expr.line, expr.column))

@@ -3,6 +3,7 @@ from __future__ import annotations
 from seme.compiler import compile_program
 from seme.lexer import lex
 from seme.parser import parse
+from seme.runtime import SemeBool, SemeInt, SemeString
 from seme.typechecker import check_types
 
 
@@ -34,7 +35,7 @@ def test_compile_linear_program_with_decls_assign_and_print() -> None:
     ]
     assert chunk.instructions[1].operands == (0,)
     assert chunk.instructions[6].operands == (0,)
-    assert chunk.constants == [1, 2]
+    assert chunk.constants == [SemeInt(1), SemeInt(2)]
 
 
 def test_compile_uninitialized_let_uses_sentinel_opcode() -> None:
@@ -62,4 +63,14 @@ def test_compile_logical_and_uses_short_circuit_jumps() -> None:
     ]
     assert chunk.instructions[1].operands == (5,)
     assert chunk.instructions[4].operands == (7,)
-    assert chunk.constants == [True, False, False]
+    assert chunk.constants == [SemeBool(True), SemeBool(False), SemeBool(False)]
+
+
+def test_compile_mixed_literal_kinds_to_runtime_value_constants() -> None:
+    chunk = compile_source('let n = 1; let ok = false; let msg = "hi";')
+
+    assert chunk.constants == [
+        SemeInt(1),
+        SemeBool(False),
+        SemeString("hi"),
+    ]

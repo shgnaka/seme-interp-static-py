@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-ConstantValue = int | bool | str
+from seme.runtime import RuntimeValue
+
+ConstantValue = RuntimeValue
 
 
 class OpCode(StrEnum):

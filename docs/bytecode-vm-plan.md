@@ -79,11 +79,13 @@ MVP で必要な opcode は次の通り。
 chunk は次の 3 要素を持つ。
 
 - `instructions`: opcode と operand 列
-- `constants`: `int | bool | string` を格納する定数プール
+- `constants`: `SemeInt | SemeBool | SemeString` を格納する定数プール
 - `source_map`: 各 instruction offset に対応する `line` / `column`
 
 この形により compiler と VM は同じ実行単位を共有でき、runtime fault 発生時も
 instruction pointer から元ソース位置を逆引きできる。
+
+runtime value の詳細方針は `docs/runtime-values.md` を参照する。
 
 ## 5. Milestones
 
