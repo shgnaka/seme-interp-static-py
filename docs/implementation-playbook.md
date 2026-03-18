@@ -153,6 +153,12 @@
 3. `run`系ケースを追加
 4. 診断は少なくとも `code`, `message`, `line`, `column` を比較
 
+現在の fixture 配置:
+
+- `tests/fixtures/check_cases.json`: `seme check` 用の成功・失敗ケース
+- `tests/fixtures/run_cases.json`: `seme run` 用の成功・失敗ケース
+- `tests/cli/test_conformance_cli.py`: fixture を読み込んで CLI の exit code / stdout / diagnostics を比較する harness
+
 ## 8. MVP Acceptance Checklist
 
 - Lexer/Parser/TypeChecker/Interpreter/CLI の全DoD達成

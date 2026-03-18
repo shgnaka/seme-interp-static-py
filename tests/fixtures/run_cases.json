@@ -1,0 +1,85 @@
+[
+  {
+    "name": "run success",
+    "source": "print(1); print(true);",
+    "expected_exit_code": 0,
+    "expected_stdout": "1\ntrue\n",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "run parse error",
+    "source": "let x = 1",
+    "expected_exit_code": 1,
+    "expected_stdout": "",
+    "expected_diagnostics": [
+      {
+        "code": "PARSE-001",
+        "message": "Expected ';' after let declaration, got EOF",
+        "line": 1,
+        "column": 10
+      }
+    ]
+  },
+  {
+    "name": "run type error",
+    "source": "if (1) { print(1); }",
+    "expected_exit_code": 1,
+    "expected_stdout": "",
+    "expected_diagnostics": [
+      {
+        "code": "TYPE-007",
+        "message": "if condition must be bool",
+        "line": 1,
+        "column": 5
+      }
+    ]
+  },
+  {
+    "name": "run runtime error keeps partial stdout",
+    "source": "print(1); let x = 1 / 0; print(x);",
+    "expected_exit_code": 1,
+    "expected_stdout": "1\n",
+    "expected_diagnostics": [
+      {
+        "code": "RUNTIME-001",
+        "message": "Runtime error: division or modulo by zero",
+        "line": 1,
+        "column": 21
+      }
+    ]
+  },
+  {
+    "name": "run const requires initializer",
+    "source": "const x: int;",
+    "expected_exit_code": 1,
+    "expected_stdout": "",
+    "expected_diagnostics": [
+      {
+        "code": "PARSE-001",
+        "message": "Expected '=' and initializer in const declaration, got ;",
+        "line": 1,
+        "column": 13
+      }
+    ]
+  },
+  {
+    "name": "run print in value context",
+    "source": "print(1) == print(2);",
+    "expected_exit_code": 1,
+    "expected_stdout": "",
+    "expected_diagnostics": [
+      {
+        "code": "TYPE-008",
+        "message": "print(expr) can only appear as a statement",
+        "line": 1,
+        "column": 6
+      },
+      {
+        "code": "TYPE-008",
+        "message": "print(expr) can only appear as a statement",
+        "line": 1,
+        "column": 18
+      }
+    ]
+  }
+]
