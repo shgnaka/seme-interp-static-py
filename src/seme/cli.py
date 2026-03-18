@@ -10,7 +10,7 @@ from seme.diagnostics import Diagnostic
 from seme.interpreter import Interpreter
 from seme.lexer import lex
 from seme.parser import parse
-from seme.pipeline import run_check, run_execute
+from seme.pipeline import ExecutionBackend, run_check, run_execute
 from seme.typechecker import check_types
 
 
@@ -41,7 +41,7 @@ def _cmd_check(file_path: str) -> int:
     return 0
 
 
-def _cmd_run(file_path: str) -> int:
+def _cmd_run(file_path: str, backend: ExecutionBackend) -> int:
     path = Path(file_path)
     try:
         source = path.read_text(encoding="utf-8")
@@ -49,7 +49,7 @@ def _cmd_run(file_path: str) -> int:
         print(f"RUNTIME-001 1:1 Failed to read file: {exc}", file=sys.stderr)
         return 1
 
-    stdout_text, diagnostics = run_execute(source)
+    stdout_text, diagnostics = run_execute(source, backend=backend)
     if stdout_text:
         sys.stdout.write(stdout_text)
     if diagnostics:
@@ -149,6 +149,12 @@ def main(argv: list[str] | None = None) -> int:
 
     run_parser = sub.add_parser("run")
     run_parser.add_argument("file")
+    run_parser.add_argument(
+        "--backend",
+        choices=("vm", "interpreter"),
+        default="vm",
+        help="Execution backend to use for seme run.",
+    )
 
     sub.add_parser("repl")
 
@@ -157,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check":
         return _cmd_check(args.file)
     if args.command == "run":
-        return _cmd_run(args.file)
+        return _cmd_run(args.file, backend=args.backend)
     if args.command == "repl":
         return _cmd_repl()
 

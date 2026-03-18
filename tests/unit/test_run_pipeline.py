@@ -68,3 +68,22 @@ def test_run_execute_print_bad_arity_in_value_context_is_single_type_error() -> 
     ] == [
         ("TYPE-008", "print requires exactly one argument", 1, 14),
     ]
+
+
+def test_run_execute_vm_and_interpreter_backends_match() -> None:
+    source = """
+let sum = 0;
+for (let i = 0; i < 4; i = i + 1) {
+  if (i < 3) {
+    sum = sum + i;
+  }
+}
+print(sum);
+""".strip()
+    vm_stdout, vm_diags = run_execute(source, backend="vm")
+    interp_stdout, interp_diags = run_execute(source, backend="interpreter")
+
+    assert vm_stdout == interp_stdout
+    assert [(d.code, d.message, d.line, d.column) for d in vm_diags] == [
+        (d.code, d.message, d.line, d.column) for d in interp_diags
+    ]
