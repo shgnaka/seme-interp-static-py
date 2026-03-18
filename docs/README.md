@@ -136,6 +136,7 @@ seme> :quit
 - `docs/language-guide.md`: 開発原則と適用範囲の入口
 - `docs/spec-mvp-local.md`: 実装判断の規範仕様
 - `docs/implementation-playbook.md`: フェーズ別実装手順と受け入れ条件
+- `docs/bytecode-vm-plan.md`: bytecode/VM 実行トラックへの移行計画
 - `docs/branching.md`: ブランチ運用ルール
 - `docs/branching-quick-ref.md`: ブランチ運用クイックリファレンス
 
