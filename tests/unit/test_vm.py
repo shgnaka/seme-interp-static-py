@@ -3,8 +3,9 @@ from __future__ import annotations
 from seme.compiler import compile_program
 from seme.lexer import lex
 from seme.parser import parse
+from seme.runtime import SemeBool, SemeInt
 from seme.typechecker import check_types
-from seme.vm import execute_chunk
+from seme.vm import VirtualMachine, execute_chunk
 
 
 def execute_source(source: str):
@@ -16,6 +17,16 @@ def execute_source(source: str):
     assert type_diags == []
     chunk = compile_program(program)
     return execute_chunk(chunk)
+
+
+def compile_checked_chunk(source: str):
+    tokens, lex_diags = lex(source)
+    assert lex_diags == []
+    program, parse_diags = parse(tokens)
+    assert parse_diags == []
+    type_diags = check_types(program)
+    assert type_diags == []
+    return compile_program(program)
 
 
 def test_vm_executes_basic_program_and_prints_output() -> None:
@@ -82,3 +93,14 @@ print(x);
     assert [(d.code, d.line, d.column) for d in diags] == [
         ("RUNTIME-001", 2, 12),
     ]
+
+
+def test_vm_keeps_runtime_value_objects_in_local_slots() -> None:
+    chunk = compile_checked_chunk("let x = 1 + 2; let ok = x == 3;")
+    vm = VirtualMachine(chunk)
+
+    stdout_lines, diags = vm.execute()
+
+    assert stdout_lines == []
+    assert diags == []
+    assert vm.locals[:2] == [SemeInt(3), SemeBool(True)]

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from seme.interpreter import eval_program
+from seme.interpreter import Interpreter, eval_program
 from seme.lexer import lex
 from seme.parser import parse
+from seme.runtime import SemeBool, SemeInt
 from seme.typechecker import check_types
 
 
@@ -14,6 +15,16 @@ def eval_source(source: str):
     type_diags = check_types(program)
     assert type_diags == []
     return eval_program(program)
+
+
+def parse_checked_program(source: str):
+    tokens, lex_diags = lex(source)
+    assert lex_diags == []
+    program, parse_diags = parse(tokens)
+    assert parse_diags == []
+    type_diags = check_types(program)
+    assert type_diags == []
+    return program
 
 
 def test_arithmetic_and_print_output() -> None:
@@ -78,3 +89,15 @@ def test_runtime_error_uninitialized_variable() -> None:
     assert len(diags) == 1
     assert diags[0].code == "RUNTIME-001"
     assert "uninitialized" in diags[0].message
+
+
+def test_interpreter_stores_runtime_value_objects_in_bindings() -> None:
+    program = parse_checked_program("let x = 1 + 2; let ok = x == 3;")
+    interpreter = Interpreter()
+
+    lines, diags = interpreter.execute(program)
+
+    assert lines == []
+    assert diags == []
+    assert interpreter._resolve("x").value == SemeInt(3)
+    assert interpreter._resolve("ok").value == SemeBool(True)

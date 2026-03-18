@@ -4,10 +4,23 @@ from dataclasses import dataclass, field
 
 from seme.bytecode import Chunk, OpCode
 from seme.diagnostics import Diagnostic
-
-RuntimeValue = int | bool | str
-StackValue = RuntimeValue | object
-_UNINITIALIZED = object()
+from seme.runtime import (
+    RuntimeValue,
+    RuntimeValueError,
+    SemeBool,
+    SemeInt,
+    SemeString,
+    StackValue,
+    UNINITIALIZED,
+    expect_bool,
+    format_runtime_value,
+    require_runtime_value,
+    runtime_arithmetic,
+    runtime_compare,
+    runtime_equal,
+    runtime_negate,
+    runtime_not,
+)
 
 
 @dataclass(frozen=True)
@@ -63,7 +76,7 @@ class VirtualMachine:
             self.stack.append(self.chunk.constants[operands[0]])
             return
         if opcode == OpCode.LOAD_UNINITIALIZED:
-            self.stack.append(_UNINITIALIZED)
+            self.stack.append(UNINITIALIZED)
             return
         if opcode == OpCode.LOAD_LOCAL:
             slot = operands[0]
@@ -87,70 +100,75 @@ class VirtualMachine:
         if opcode in (OpCode.ADD, OpCode.SUB, OpCode.MUL, OpCode.DIV, OpCode.MOD):
             right = self._pop_runtime(current_offset)
             left = self._pop_runtime(current_offset)
-            if not self._is_int(left) or not self._is_int(right):
-                self._fault("arithmetic operators require int operands", current_offset)
-            if opcode == OpCode.ADD:
-                self.stack.append(left + right)
-                return
-            if opcode == OpCode.SUB:
-                self.stack.append(left - right)
-                return
-            if opcode == OpCode.MUL:
-                self.stack.append(left * right)
-                return
-            if right == 0:
-                self._fault("division or modulo by zero", current_offset)
-            if opcode == OpCode.DIV:
-                self.stack.append(left // right)
-                return
-            self.stack.append(left % right)
+            try:
+                if opcode == OpCode.ADD:
+                    self.stack.append(runtime_arithmetic("add", left, right))
+                    return
+                if opcode == OpCode.SUB:
+                    self.stack.append(runtime_arithmetic("sub", left, right))
+                    return
+                if opcode == OpCode.MUL:
+                    self.stack.append(runtime_arithmetic("mul", left, right))
+                    return
+                if opcode == OpCode.DIV:
+                    self.stack.append(runtime_arithmetic("div", left, right))
+                    return
+                self.stack.append(runtime_arithmetic("mod", left, right))
+            except RuntimeValueError as err:
+                self._fault(err.message, current_offset)
             return
         if opcode == OpCode.NEGATE:
             operand = self._pop_runtime(current_offset)
-            if not self._is_int(operand):
-                self._fault("unary '-' requires int operand", current_offset)
-            self.stack.append(-operand)
+            try:
+                self.stack.append(runtime_negate(operand))
+            except RuntimeValueError as err:
+                self._fault(err.message, current_offset)
             return
         if opcode == OpCode.NOT:
             operand = self._pop_runtime(current_offset)
-            if not isinstance(operand, bool):
-                self._fault("operator '!' requires bool operand", current_offset)
-            self.stack.append(not operand)
+            try:
+                self.stack.append(runtime_not(operand))
+            except RuntimeValueError as err:
+                self._fault(err.message, current_offset)
             return
         if opcode in (OpCode.EQUAL, OpCode.NOT_EQUAL):
             right = self._pop_runtime(current_offset)
             left = self._pop_runtime(current_offset)
-            if type(left) is not type(right):
-                self._fault("equality operators require matching types", current_offset)
-            self.stack.append(left == right if opcode == OpCode.EQUAL else left != right)
+            try:
+                self.stack.append(runtime_equal("eq" if opcode == OpCode.EQUAL else "neq", left, right))
+            except RuntimeValueError as err:
+                self._fault(err.message, current_offset)
             return
         if opcode in (OpCode.LESS, OpCode.LESS_EQUAL, OpCode.GREATER, OpCode.GREATER_EQUAL):
             right = self._pop_runtime(current_offset)
             left = self._pop_runtime(current_offset)
-            if not self._is_int(left) or not self._is_int(right):
-                self._fault("comparison operators require int operands", current_offset)
-            if opcode == OpCode.LESS:
-                self.stack.append(left < right)
-            elif opcode == OpCode.LESS_EQUAL:
-                self.stack.append(left <= right)
-            elif opcode == OpCode.GREATER:
-                self.stack.append(left > right)
-            else:
-                self.stack.append(left >= right)
+            try:
+                if opcode == OpCode.LESS:
+                    self.stack.append(runtime_compare("lt", left, right))
+                elif opcode == OpCode.LESS_EQUAL:
+                    self.stack.append(runtime_compare("lte", left, right))
+                elif opcode == OpCode.GREATER:
+                    self.stack.append(runtime_compare("gt", left, right))
+                else:
+                    self.stack.append(runtime_compare("gte", left, right))
+            except RuntimeValueError as err:
+                self._fault(err.message, current_offset)
             return
         if opcode == OpCode.JUMP:
             self.ip = operands[0]
             return
         if opcode == OpCode.JUMP_IF_FALSE:
             value = self._peek_runtime(current_offset)
-            if not isinstance(value, bool):
-                self._fault("condition must evaluate to bool", current_offset)
-            if not value:
+            try:
+                condition = expect_bool(value, "condition must evaluate to bool")
+            except RuntimeValueError as err:
+                self._fault(err.message, current_offset)
+            if not condition:
                 self.ip = operands[0]
             return
         if opcode == OpCode.PRINT:
             value = self._pop_runtime(current_offset)
-            self.stdout_lines.append(self._format_value(value))
+            self.stdout_lines.append(format_runtime_value(value))
             return
         if opcode == OpCode.RETURN:
             self.ip = len(self.chunk.instructions)
@@ -162,15 +180,15 @@ class VirtualMachine:
         if slot >= len(self.locals):
             self._fault(f"invalid local slot {slot}", offset)
         value = self.locals[slot]
-        if value is _UNINITIALIZED:
+        if value is UNINITIALIZED:
             self._fault(f"variable in slot {slot} is uninitialized", offset)
-        if not isinstance(value, (int, bool, str)):
+        if not isinstance(value, (SemeInt, SemeBool, SemeString)):
             self._fault(f"invalid runtime value in slot {slot}", offset)
         return value
 
     def _write_local(self, slot: int, value: StackValue, offset: int) -> None:
         while len(self.locals) <= slot:
-            self.locals.append(_UNINITIALIZED)
+            self.locals.append(UNINITIALIZED)
         self.locals[slot] = value
 
     def _peek(self, offset: int) -> StackValue:
@@ -180,11 +198,10 @@ class VirtualMachine:
 
     def _peek_runtime(self, offset: int) -> RuntimeValue:
         value = self._peek(offset)
-        if value is _UNINITIALIZED:
-            self._fault("uninitialized value used in expression", offset)
-        if not isinstance(value, (int, bool, str)):
-            self._fault("invalid runtime value on stack", offset)
-        return value
+        try:
+            return require_runtime_value(value)
+        except RuntimeValueError as err:
+            self._fault(err.message, offset)
 
     def _pop(self, offset: int) -> StackValue:
         if not self.stack:
@@ -193,22 +210,13 @@ class VirtualMachine:
 
     def _pop_runtime(self, offset: int) -> RuntimeValue:
         value = self._pop(offset)
-        if value is _UNINITIALIZED:
-            self._fault("uninitialized value used in expression", offset)
-        if not isinstance(value, (int, bool, str)):
-            self._fault("invalid runtime value on stack", offset)
-        return value
+        try:
+            return require_runtime_value(value)
+        except RuntimeValueError as err:
+            self._fault(err.message, offset)
 
     def _fault(self, message: str, offset: int) -> None:
         raise RuntimeFault(message=message, offset=offset)
-
-    def _format_value(self, value: RuntimeValue) -> str:
-        if isinstance(value, bool):
-            return "true" if value else "false"
-        return str(value)
-
-    def _is_int(self, value: RuntimeValue) -> bool:
-        return isinstance(value, int) and not isinstance(value, bool)
 
 
 def execute_chunk(chunk: Chunk) -> tuple[list[str], list[Diagnostic]]:
