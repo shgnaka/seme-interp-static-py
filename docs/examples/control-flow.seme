@@ -1,0 +1,11 @@
+let sum: int = 0;
+
+for (let i = 0; i < 3; i = i + 1) {
+  sum = sum + i;
+}
+
+if (sum > 0) {
+  print(sum);
+} else {
+  print(0);
+}

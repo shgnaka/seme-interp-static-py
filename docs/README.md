@@ -35,6 +35,102 @@ PYTHONPATH=src python3 -m seme.cli repl
 print(1);
 ```
 
+## Quickstart
+
+サンプルプログラムは `docs/examples/` に置いてある。
+
+- `docs/examples/hello.seme`: 最小の `print`
+- `docs/examples/control-flow.seme`: `let`, `for`, `if`
+- `docs/examples/type-error.seme`: 型エラー例
+
+まずは構文チェックだけ行う:
+
+```bash
+seme check docs/examples/hello.seme
+```
+
+成功時は終了コード `0` で、stderr には何も出ない。
+
+次に実行する:
+
+```bash
+seme run docs/examples/hello.seme
+```
+
+期待される出力:
+
+```text
+1
+```
+
+もう少し大きい例:
+
+```bash
+seme run docs/examples/control-flow.seme
+```
+
+期待される出力:
+
+```text
+3
+```
+
+ソース:
+
+```text
+let sum: int = 0;
+
+for (let i = 0; i < 3; i = i + 1) {
+  sum = sum + i;
+}
+
+if (sum > 0) {
+  print(sum);
+} else {
+  print(0);
+}
+```
+
+## Error Example
+
+型エラーがある場合、`run` は実行まで進まず診断を stderr に出して終了する。
+
+```bash
+seme check docs/examples/type-error.seme
+```
+
+期待される診断:
+
+```text
+TYPE-007 1:5 if condition must be bool
+```
+
+ソース:
+
+```text
+if (1) {
+  print(1);
+}
+```
+
+## REPL Example
+
+`repl` では1行ごとに文を評価する。
+
+```bash
+seme repl
+```
+
+入力例:
+
+```text
+seme> let x = 1;
+seme> x = x + 1;
+seme> print(x);
+2
+seme> :quit
+```
+
 ## Documents
 
 - `docs/language-guide.md`: 開発原則と適用範囲の入口
