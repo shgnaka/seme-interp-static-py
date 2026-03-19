@@ -41,3 +41,4 @@ runtime value の最小方針を残す。
 
 - 文字列演算や将来の runtime value 種別を追加する場合もこの module を拡張点にする
 - 必要なら今後、runtime helper API と fault 方針をさらに docs に昇格させる
+- heap-managed object の設計方針は `docs/runtime-objects.md` を参照する

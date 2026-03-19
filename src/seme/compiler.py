@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 
 from seme.ast import Assign, Binary, Block, Call, ConstDecl, Expr, ExprStmt, For, Grouping, Identifier, If, LetDecl, Literal, Program, Stmt, Unary, While
 from seme.bytecode import Chunk, GlobalInfo, LocalInfo, OpCode, SourceSpan
+from seme.bytecode_disassembler import disassemble_chunk
+from seme.bytecode_peephole import optimize_chunk
 from seme.runtime import RuntimeValue, make_runtime_value
 from seme.token import TokenKind
 
@@ -107,15 +109,7 @@ class BytecodeBuilder:
         )
 
     def render(self) -> list[str]:
-        rendered: list[str] = []
-        for offset, instruction in enumerate(self.chunk.instructions):
-            span = self.chunk.span_for_offset(offset)
-            operands = " ".join(str(operand) for operand in instruction.operands)
-            suffix = f" {operands}" if operands else ""
-            rendered.append(
-                f"{offset:04d} {instruction.opcode.value}{suffix} ; {span.line}:{span.column}"
-            )
-        return rendered
+        return disassemble_chunk(self.chunk)
 
 
 __all__ = [
@@ -126,14 +120,18 @@ __all__ = [
 
 
 class Compiler:
-    def __init__(self) -> None:
+    def __init__(self, *, optimize: bool = True) -> None:
         self.builder = BytecodeBuilder()
+        self.optimize = optimize
 
     def compile(self, program: Program) -> Chunk:
         for stmt in program.statements:
             self._compile_stmt(stmt)
         self.builder.emit(OpCode.RETURN, span=SourceSpan(program.line, program.column))
-        return self.builder.chunk
+        chunk = self.builder.chunk
+        if self.optimize:
+            return optimize_chunk(chunk)
+        return chunk
 
     def _compile_stmt(self, stmt: Stmt) -> None:
         if isinstance(stmt, LetDecl):
@@ -411,8 +409,8 @@ class Compiler:
         return self.builder.add_literal_constant(name)
 
 
-def compile_program(program: Program) -> Chunk:
-    return Compiler().compile(program)
+def compile_program(program: Program, *, optimize: bool = True) -> Chunk:
+    return Compiler(optimize=optimize).compile(program)
 
 
 __all__ = [

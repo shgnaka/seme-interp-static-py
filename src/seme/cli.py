@@ -7,6 +7,7 @@ from pathlib import Path
 
 from seme.ast import Program, Stmt
 from seme.compiler import compile_program
+from seme.bytecode_disassembler import disassemble_chunk
 from seme.diagnostics import Diagnostic
 from seme.lexer import lex
 from seme.parser import parse
@@ -56,6 +57,35 @@ def _cmd_run(file_path: str, backend: ExecutionBackend) -> int:
     if diagnostics:
         _print_diagnostics(diagnostics, sys.stderr)
         return 1
+    return 0
+
+
+def _cmd_debug_bytecode(file_path: str) -> int:
+    path = Path(file_path)
+    try:
+        source = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"RUNTIME-001 1:1 Failed to read file: {exc}", file=sys.stderr)
+        return 1
+
+    tokens, lex_diags = lex(source)
+    if lex_diags:
+        _print_diagnostics(lex_diags, sys.stderr)
+        return 1
+
+    program, parse_diags = parse(tokens)
+    if parse_diags:
+        _print_diagnostics(parse_diags, sys.stderr)
+        return 1
+
+    type_diags = check_types(program)
+    if type_diags:
+        _print_diagnostics(type_diags, sys.stderr)
+        return 1
+
+    chunk = compile_program(program)
+    for line in disassemble_chunk(chunk):
+        print(line)
     return 0
 
 
@@ -156,6 +186,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Execution backend to use for seme run.",
     )
 
+    debug_parser = sub.add_parser("debug")
+    debug_sub = debug_parser.add_subparsers(dest="debug_command", required=True)
+    bytecode_parser = debug_sub.add_parser("bytecode")
+    bytecode_parser.add_argument("file")
+
     sub.add_parser("repl")
 
     args = parser.parse_args(argv)
@@ -164,6 +199,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_check(args.file)
     if args.command == "run":
         return _cmd_run(args.file, backend=args.backend)
+    if args.command == "debug" and args.debug_command == "bytecode":
+        return _cmd_debug_bytecode(args.file)
     if args.command == "repl":
         return _cmd_repl()
 
