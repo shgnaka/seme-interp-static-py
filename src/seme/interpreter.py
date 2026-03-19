@@ -21,18 +21,17 @@ from seme.ast import (
     Unary,
     While,
 )
+from seme.builtins import DEFAULT_BUILTINS
 from seme.diagnostics import Diagnostic
 from seme.runtime import (
+    RuntimeHeap,
     RuntimeValue,
     RuntimeValueError,
     SemeBool,
-    SemeInt,
-    SemeString,
     StackValue,
     UNINITIALIZED,
-    VOID,
     expect_bool,
-    format_runtime_value,
+    is_runtime_value,
     make_runtime_value,
     require_runtime_value,
     runtime_arithmetic,
@@ -40,6 +39,11 @@ from seme.runtime import (
     runtime_equal,
     runtime_negate,
     runtime_not,
+)
+from seme.runtime_faults import (
+    RuntimeFault,
+    diagnostic_from_runtime_fault,
+    diagnostic_from_unexpected_runtime_error,
 )
 from seme.token import TokenKind
 
@@ -52,17 +56,24 @@ class RuntimeBinding:
     is_const: bool
 
 
-@dataclass(frozen=True)
-class RuntimeFault(Exception):
-    message: str
-    line: int
-    column: int
-
-
 class Interpreter:
     def __init__(self) -> None:
+        self.heap = RuntimeHeap()
         self.scopes: list[dict[str, RuntimeBinding]] = [{}]
         self.stdout_lines: list[str] = []
+
+    @property
+    def runtime_heap(self) -> RuntimeHeap:
+        return self.heap
+
+    def write_stdout_line(self, line: str) -> None:
+        self.stdout_lines.append(line)
+
+    def gc_root_values(self) -> list[StackValue]:
+        roots: list[StackValue] = []
+        for scope in self.scopes:
+            roots.extend(binding.value for binding in scope.values())
+        return roots
 
     def execute(self, program: Program) -> tuple[list[str], list[Diagnostic]]:
         start_index = len(self.stdout_lines)
@@ -72,20 +83,12 @@ class Interpreter:
                 self._eval_stmt(stmt)
             return self.stdout_lines[start_index:], diagnostics
         except RuntimeFault as err:
-            diagnostics.append(
-                Diagnostic(
-                    code="RUNTIME-001",
-                    message=f"Runtime error: {err.message}",
-                    line=err.line,
-                    column=err.column,
-                )
-            )
+            diagnostics.append(diagnostic_from_runtime_fault(err))
             return self.stdout_lines[start_index:], diagnostics
         except Exception as exc:  # pragma: no cover
             diagnostics.append(
-                Diagnostic(
-                    code="RUNTIME-001",
-                    message=f"Runtime error: {exc}",
+                diagnostic_from_unexpected_runtime_error(
+                    exc,
                     line=program.line,
                     column=program.column,
                 )
@@ -215,7 +218,7 @@ class Interpreter:
 
     def _eval_expr(self, expr: Expr) -> EvalValue:
         if isinstance(expr, Literal):
-            return make_runtime_value(expr.value)
+            return make_runtime_value(expr.value, heap=self.heap)
 
         if isinstance(expr, Identifier):
             return self._read(expr.name, expr.line, expr.column)
@@ -315,9 +318,9 @@ class Interpreter:
                 if op == TokenKind.GTE:
                     return runtime_compare("gte", left, right)
                 if op == TokenKind.EQEQ:
-                    return runtime_equal("eq", left, right)
+                    return runtime_equal("eq", left, right, heap=self.heap)
                 if op == TokenKind.NEQ:
-                    return runtime_equal("neq", left, right)
+                    return runtime_equal("neq", left, right, heap=self.heap)
                 self._runtime_error(expr.line, expr.column, "unsupported binary operator")
             except RuntimeValueError as err:
                 self._runtime_error(expr.line, expr.column, err.message)
@@ -325,15 +328,18 @@ class Interpreter:
         if isinstance(expr, Call):
             if not isinstance(expr.callee, Identifier) or expr.callee.name != "print":
                 self._runtime_error(expr.line, expr.column, "only print(expr) call is supported")
-            if len(expr.arguments) != 1:
-                self._runtime_error(expr.line, expr.column, "print requires exactly one argument")
-            value = self._require_runtime_value(
-                self._eval_expr(expr.arguments[0]),
-                expr.arguments[0].line,
-                expr.arguments[0].column,
-            )
-            self.stdout_lines.append(format_runtime_value(value))
-            return VOID
+            args = [
+                self._require_runtime_value(
+                    self._eval_expr(argument),
+                    argument.line,
+                    argument.column,
+                )
+                for argument in expr.arguments
+            ]
+            try:
+                return DEFAULT_BUILTINS.invoke(expr.callee.name, args, self)
+            except RuntimeValueError as err:
+                self._runtime_error(expr.line, expr.column, err.message)
 
         self._runtime_error(expr.line, expr.column, "unsupported expression")
 
@@ -379,7 +385,7 @@ class Interpreter:
             resolved = require_runtime_value(value)
         except RuntimeValueError as err:
             self._runtime_error(line, column, err.message)
-        if not isinstance(resolved, (SemeInt, SemeBool, SemeString)):
+        if not is_runtime_value(resolved):
             self._runtime_error(line, column, "invalid runtime value")
         return resolved
 

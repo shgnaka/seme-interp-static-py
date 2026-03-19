@@ -31,6 +31,9 @@ def test_chunk_preserves_parallel_instruction_and_source_map_lengths() -> None:
 
 
 def test_documented_instruction_set_covers_control_flow_and_runtime_ops() -> None:
+    assert OpCode.LOAD_GLOBAL in BYTECODE_INSTRUCTION_SET
+    assert OpCode.DEFINE_GLOBAL in BYTECODE_INSTRUCTION_SET
+    assert OpCode.STORE_GLOBAL in BYTECODE_INSTRUCTION_SET
     assert OpCode.JUMP in BYTECODE_INSTRUCTION_SET
     assert OpCode.JUMP_IF_FALSE in BYTECODE_INSTRUCTION_SET
     assert OpCode.PRINT in BYTECODE_INSTRUCTION_SET

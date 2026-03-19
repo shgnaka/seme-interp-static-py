@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from seme.ast import Assign, Binary, Block, Call, ConstDecl, Expr, ExprStmt, For, Grouping, Identifier, If, LetDecl, Literal, Program, Stmt, Unary, While
-from seme.bytecode import Chunk, LocalInfo, OpCode, SourceSpan
+from seme.bytecode import Chunk, GlobalInfo, LocalInfo, OpCode, SourceSpan
 from seme.runtime import RuntimeValue, make_runtime_value
 from seme.token import TokenKind
 
@@ -19,6 +19,7 @@ class Label:
 class CompilerState:
     chunk: Chunk = field(default_factory=Chunk)
     locals: list[LocalInfo] = field(default_factory=list)
+    globals: dict[str, GlobalInfo] = field(default_factory=dict)
     scope_depth: int = 0
 
     def begin_scope(self) -> None:
@@ -46,6 +47,14 @@ class CompilerState:
             if local.name == name:
                 return local
         return None
+
+    def declare_global(self, name: str, *, is_const: bool) -> GlobalInfo:
+        global_info = GlobalInfo(name=name, is_const=is_const)
+        self.globals[name] = global_info
+        return global_info
+
+    def resolve_global(self, name: str) -> GlobalInfo | None:
+        return self.globals.get(name)
 
 
 class BytecodeBuilder:
@@ -128,26 +137,56 @@ class Compiler:
 
     def _compile_stmt(self, stmt: Stmt) -> None:
         if isinstance(stmt, LetDecl):
-            local = self.builder.state.declare_local(stmt.name, is_const=False)
+            is_global = self.builder.state.scope_depth == 0
+            if is_global:
+                self.builder.state.declare_global(stmt.name, is_const=False)
+            else:
+                local = self.builder.state.declare_local(stmt.name, is_const=False)
             if stmt.initializer is None:
                 self.builder.emit(OpCode.LOAD_UNINITIALIZED, span=SourceSpan(stmt.line, stmt.column))
             else:
                 self._compile_expr(stmt.initializer)
-            self.builder.emit(OpCode.STORE_LOCAL, local.slot, span=SourceSpan(stmt.line, stmt.column))
+            if is_global:
+                self.builder.emit(
+                    OpCode.DEFINE_GLOBAL,
+                    self._name_constant_index(stmt.name),
+                    span=SourceSpan(stmt.line, stmt.column),
+                )
+            else:
+                self.builder.emit(OpCode.STORE_LOCAL, local.slot, span=SourceSpan(stmt.line, stmt.column))
             self.builder.emit(OpCode.POP, span=SourceSpan(stmt.line, stmt.column))
             return
 
         if isinstance(stmt, ConstDecl):
-            local = self.builder.state.declare_local(stmt.name, is_const=True)
+            is_global = self.builder.state.scope_depth == 0
+            if is_global:
+                self.builder.state.declare_global(stmt.name, is_const=True)
+            else:
+                local = self.builder.state.declare_local(stmt.name, is_const=True)
             self._compile_expr(stmt.initializer)
-            self.builder.emit(OpCode.STORE_LOCAL, local.slot, span=SourceSpan(stmt.line, stmt.column))
+            if is_global:
+                self.builder.emit(
+                    OpCode.DEFINE_GLOBAL,
+                    self._name_constant_index(stmt.name),
+                    span=SourceSpan(stmt.line, stmt.column),
+                )
+            else:
+                self.builder.emit(OpCode.STORE_LOCAL, local.slot, span=SourceSpan(stmt.line, stmt.column))
             self.builder.emit(OpCode.POP, span=SourceSpan(stmt.line, stmt.column))
             return
 
         if isinstance(stmt, Assign):
-            local = self._require_local(stmt.name, stmt.line, stmt.column)
             self._compile_expr(stmt.value)
-            self.builder.emit(OpCode.STORE_LOCAL, local.slot, span=SourceSpan(stmt.line, stmt.column))
+            local = self.builder.state.resolve_local(stmt.name)
+            if local is not None:
+                self.builder.emit(OpCode.STORE_LOCAL, local.slot, span=SourceSpan(stmt.line, stmt.column))
+            else:
+                self._require_global(stmt.name, stmt.line, stmt.column)
+                self.builder.emit(
+                    OpCode.STORE_GLOBAL,
+                    self._name_constant_index(stmt.name),
+                    span=SourceSpan(stmt.line, stmt.column),
+                )
             self.builder.emit(OpCode.POP, span=SourceSpan(stmt.line, stmt.column))
             return
 
@@ -186,8 +225,16 @@ class Compiler:
             return
 
         if isinstance(expr, Identifier):
-            local = self._require_local(expr.name, expr.line, expr.column)
-            self.builder.emit(OpCode.LOAD_LOCAL, local.slot, span=SourceSpan(expr.line, expr.column))
+            local = self.builder.state.resolve_local(expr.name)
+            if local is not None:
+                self.builder.emit(OpCode.LOAD_LOCAL, local.slot, span=SourceSpan(expr.line, expr.column))
+                return
+            self._require_global(expr.name, expr.line, expr.column)
+            self.builder.emit(
+                OpCode.LOAD_GLOBAL,
+                self._name_constant_index(expr.name),
+                span=SourceSpan(expr.line, expr.column),
+            )
             return
 
         if isinstance(expr, Grouping):
@@ -353,6 +400,15 @@ class Compiler:
         if local is None:
             raise ValueError(f"unresolved local '{name}' at {line}:{column}")
         return local
+
+    def _require_global(self, name: str, line: int, column: int) -> GlobalInfo:
+        global_info = self.builder.state.resolve_global(name)
+        if global_info is None:
+            raise ValueError(f"unresolved global '{name}' at {line}:{column}")
+        return global_info
+
+    def _name_constant_index(self, name: str) -> int:
+        return self.builder.add_literal_constant(name)
 
 
 def compile_program(program: Program) -> Chunk:

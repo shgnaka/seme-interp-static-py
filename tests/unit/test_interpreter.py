@@ -3,7 +3,7 @@ from __future__ import annotations
 from seme.interpreter import Interpreter, eval_program
 from seme.lexer import lex
 from seme.parser import parse
-from seme.runtime import SemeBool, SemeInt
+from seme.runtime import HeapRef, SemeBool, SemeInt
 from seme.typechecker import check_types
 
 
@@ -101,3 +101,15 @@ def test_interpreter_stores_runtime_value_objects_in_bindings() -> None:
     assert diags == []
     assert interpreter._resolve("x").value == SemeInt(3)
     assert interpreter._resolve("ok").value == SemeBool(True)
+
+
+def test_interpreter_exposes_gc_root_values_for_live_bindings() -> None:
+    program = parse_checked_program('let msg = "hi"; let count = 1;')
+    interpreter = Interpreter()
+
+    lines, diags = interpreter.execute(program)
+
+    assert lines == []
+    assert diags == []
+    assert any(isinstance(value, HeapRef) for value in interpreter.gc_root_values())
+    assert interpreter.heap.live_object_ids(interpreter.gc_root_values()) == {1}

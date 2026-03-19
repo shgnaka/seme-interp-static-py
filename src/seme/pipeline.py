@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from hashlib import sha256
 from typing import Literal
 
+from seme.bytecode_cache import BytecodeCache
 from seme.compiler import compile_program
 from seme.diagnostics import Diagnostic
 from seme.interpreter import eval_program
@@ -11,6 +13,7 @@ from seme.typechecker import check_types
 from seme.vm import execute_chunk
 
 ExecutionBackend = Literal["vm", "interpreter"]
+COMPILER_VERSION = "bytecode-cache-v1"
 
 
 def run_check(source: str) -> list[Diagnostic]:
@@ -23,7 +26,12 @@ def run_check(source: str) -> list[Diagnostic]:
     return check_types(program)
 
 
-def run_execute(source: str, backend: ExecutionBackend = "vm") -> tuple[str, list[Diagnostic]]:
+def run_execute(
+    source: str,
+    backend: ExecutionBackend = "vm",
+    *,
+    cache: BytecodeCache | None = None,
+) -> tuple[str, list[Diagnostic]]:
     tokens, lex_diags = lex(source)
     if lex_diags:
         return "", lex_diags
@@ -37,7 +45,15 @@ def run_execute(source: str, backend: ExecutionBackend = "vm") -> tuple[str, lis
         return "", type_diags
 
     if backend == "vm":
-        chunk = compile_program(program)
+        if cache is not None:
+            source_hash = sha256(source.encode("utf-8")).hexdigest()
+            chunk = cache.get_or_build(
+                source_hash=source_hash,
+                compiler_version=COMPILER_VERSION,
+                build=lambda: compile_program(program),
+            )
+        else:
+            chunk = compile_program(program)
         stdout_lines, runtime_diags = execute_chunk(chunk)
     elif backend == "interpreter":
         stdout_lines, runtime_diags = eval_program(program)

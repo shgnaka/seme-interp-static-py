@@ -81,5 +81,19 @@
         "column": 18
       }
     ]
+  },
+  {
+    "name": "run nested scope shadowing",
+    "source": "let x = 1; { let x = 2; print(x); } print(x);",
+    "expected_exit_code": 0,
+    "expected_stdout": "2\n1\n",
+    "expected_diagnostics": []
+  },
+  {
+    "name": "run string builtin parity",
+    "source": "let msg = \"hi\"; print(msg); print(msg == \"hi\");",
+    "expected_exit_code": 0,
+    "expected_stdout": "hi\ntrue\n",
+    "expected_diagnostics": []
   }
 ]

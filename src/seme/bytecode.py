@@ -11,6 +11,9 @@ ConstantValue = RuntimeValue
 class OpCode(StrEnum):
     LOAD_CONST = "LOAD_CONST"
     LOAD_UNINITIALIZED = "LOAD_UNINITIALIZED"
+    LOAD_GLOBAL = "LOAD_GLOBAL"
+    DEFINE_GLOBAL = "DEFINE_GLOBAL"
+    STORE_GLOBAL = "STORE_GLOBAL"
     LOAD_LOCAL = "LOAD_LOCAL"
     STORE_LOCAL = "STORE_LOCAL"
     POP = "POP"
@@ -54,6 +57,12 @@ class LocalInfo:
     is_const: bool
 
 
+@dataclass(frozen=True)
+class GlobalInfo:
+    name: str
+    is_const: bool
+
+
 @dataclass
 class Chunk:
     instructions: list[Instruction] = field(default_factory=list)
@@ -76,6 +85,9 @@ class Chunk:
 BYTECODE_INSTRUCTION_SET: dict[OpCode, str] = {
     OpCode.LOAD_CONST: "Push a constant-pool value onto the operand stack.",
     OpCode.LOAD_UNINITIALIZED: "Push an uninitialized local sentinel onto the operand stack.",
+    OpCode.LOAD_GLOBAL: "Push a global value onto the operand stack by name.",
+    OpCode.DEFINE_GLOBAL: "Define or initialize a global binding from the top of stack.",
+    OpCode.STORE_GLOBAL: "Assign the top of stack into an existing global binding.",
     OpCode.LOAD_LOCAL: "Push a local slot value onto the operand stack.",
     OpCode.STORE_LOCAL: "Write the top of stack into a local slot without popping it.",
     OpCode.POP: "Discard the top stack value.",
@@ -104,6 +116,7 @@ __all__ = [
     "BYTECODE_INSTRUCTION_SET",
     "Chunk",
     "ConstantValue",
+    "GlobalInfo",
     "Instruction",
     "LocalInfo",
     "OpCode",

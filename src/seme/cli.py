@@ -6,12 +6,13 @@ from io import TextIOBase
 from pathlib import Path
 
 from seme.ast import Program, Stmt
+from seme.compiler import compile_program
 from seme.diagnostics import Diagnostic
-from seme.interpreter import Interpreter
 from seme.lexer import lex
 from seme.parser import parse
 from seme.pipeline import ExecutionBackend, run_check, run_execute
 from seme.typechecker import check_types
+from seme.vm import execute_chunk
 
 
 def _format_diagnostic(diag: Diagnostic) -> str:
@@ -65,9 +66,14 @@ def _program_for_history(statements: list[Stmt]) -> Program:
     return Program(statements=list(statements), line=first.line, column=first.column)
 
 
+def _execute_repl_program(program: Program) -> tuple[list[str], list[Diagnostic]]:
+    chunk = compile_program(program)
+    return execute_chunk(chunk)
+
+
 def repl_loop(inp: TextIOBase, out: TextIOBase, err: TextIOBase) -> int:
     history: list[Stmt] = []
-    interpreter = Interpreter()
+    committed_stdout_lines: list[str] = []
 
     while True:
         out.write("seme> ")
@@ -115,25 +121,19 @@ def repl_loop(inp: TextIOBase, out: TextIOBase, err: TextIOBase) -> int:
             _print_diagnostics(type_diags, err)
             continue
 
-        stmt_program = Program(statements=[stmt], line=stmt.line, column=stmt.column)
-        stdout_lines, runtime_diags = interpreter.execute(stmt_program)
-        for runtime_line in stdout_lines:
+        candidate_program = _program_for_history(history + [stmt])
+        stdout_lines, runtime_diags = _execute_repl_program(candidate_program)
+        new_stdout_lines = stdout_lines[len(committed_stdout_lines):]
+        for runtime_line in new_stdout_lines:
             out.write(f"{runtime_line}\n")
         out.flush()
 
         if runtime_diags:
             _print_diagnostics(runtime_diags, err)
-
-            interpreter = Interpreter()
-            if history:
-                _, rebuild_diags = interpreter.execute(_program_for_history(history))
-                if rebuild_diags:
-                    _print_diagnostics(rebuild_diags, err)
-                    history = []
-                    interpreter = Interpreter()
             continue
 
         history.append(stmt)
+        committed_stdout_lines = stdout_lines
 
 
 def _cmd_repl() -> int:

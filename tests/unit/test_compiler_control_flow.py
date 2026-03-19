@@ -21,14 +21,14 @@ def test_compile_if_else_uses_branch_and_join_jumps() -> None:
 
     assert [instruction.opcode.value for instruction in chunk.instructions] == [
         "LOAD_CONST",
-        "STORE_LOCAL",
+        "DEFINE_GLOBAL",
         "POP",
-        "LOAD_LOCAL",
+        "LOAD_GLOBAL",
         "LOAD_CONST",
         "LESS",
         "JUMP_IF_FALSE",
         "POP",
-        "LOAD_LOCAL",
+        "LOAD_GLOBAL",
         "PRINT",
         "JUMP",
         "POP",
@@ -45,17 +45,17 @@ def test_compile_while_loop_back_edges_to_condition() -> None:
 
     assert [instruction.opcode.value for instruction in chunk.instructions] == [
         "LOAD_CONST",
-        "STORE_LOCAL",
+        "DEFINE_GLOBAL",
         "POP",
-        "LOAD_LOCAL",
+        "LOAD_GLOBAL",
         "LOAD_CONST",
         "LESS",
         "JUMP_IF_FALSE",
         "POP",
-        "LOAD_LOCAL",
+        "LOAD_GLOBAL",
         "LOAD_CONST",
         "ADD",
-        "STORE_LOCAL",
+        "STORE_GLOBAL",
         "POP",
         "JUMP",
         "POP",
@@ -98,7 +98,7 @@ def test_compile_nested_blocks_cleanup_only_inner_slots() -> None:
 
     assert [instruction.opcode.value for instruction in chunk.instructions] == [
         "LOAD_CONST",
-        "STORE_LOCAL",
+        "DEFINE_GLOBAL",
         "POP",
         "LOAD_CONST",
         "STORE_LOCAL",
@@ -106,9 +106,8 @@ def test_compile_nested_blocks_cleanup_only_inner_slots() -> None:
         "LOAD_LOCAL",
         "PRINT",
         "POP_N",
-        "LOAD_LOCAL",
+        "LOAD_GLOBAL",
         "PRINT",
         "RETURN",
     ]
-    assert chunk.instructions[1].operands == (0,)
-    assert chunk.instructions[4].operands == (1,)
+    assert chunk.instructions[4].operands == (0,)

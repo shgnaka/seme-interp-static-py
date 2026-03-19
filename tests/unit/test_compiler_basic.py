@@ -22,27 +22,32 @@ def test_compile_linear_program_with_decls_assign_and_print() -> None:
 
     assert [instruction.opcode.value for instruction in chunk.instructions] == [
         "LOAD_CONST",
-        "STORE_LOCAL",
+        "DEFINE_GLOBAL",
         "POP",
-        "LOAD_LOCAL",
+        "LOAD_GLOBAL",
         "LOAD_CONST",
         "ADD",
-        "STORE_LOCAL",
+        "STORE_GLOBAL",
         "POP",
-        "LOAD_LOCAL",
+        "LOAD_GLOBAL",
         "PRINT",
         "RETURN",
     ]
-    assert chunk.instructions[1].operands == (0,)
-    assert chunk.instructions[6].operands == (0,)
-    assert chunk.constants == [SemeInt(1), SemeInt(2)]
+    assert chunk.constants[0] == SemeInt(1)
+    assert chunk.constants[3] == SemeInt(2)
+    assert [const for const in chunk.constants if const == SemeString("x")] == [
+        SemeString("x"),
+        SemeString("x"),
+        SemeString("x"),
+        SemeString("x"),
+    ]
 
 
 def test_compile_uninitialized_let_uses_sentinel_opcode() -> None:
     chunk = compile_source("let x: int; print(1);")
 
     assert chunk.instructions[0].opcode.value == "LOAD_UNINITIALIZED"
-    assert chunk.instructions[1].opcode.value == "STORE_LOCAL"
+    assert chunk.instructions[1].opcode.value == "DEFINE_GLOBAL"
     assert chunk.instructions[-1].opcode.value == "RETURN"
 
 
@@ -57,13 +62,14 @@ def test_compile_logical_and_uses_short_circuit_jumps() -> None:
         "JUMP",
         "POP",
         "LOAD_CONST",
-        "STORE_LOCAL",
+        "DEFINE_GLOBAL",
         "POP",
         "RETURN",
     ]
     assert chunk.instructions[1].operands == (5,)
     assert chunk.instructions[4].operands == (7,)
-    assert chunk.constants == [SemeBool(True), SemeBool(False), SemeBool(False)]
+    assert chunk.constants[:3] == [SemeBool(True), SemeBool(False), SemeBool(False)]
+    assert chunk.constants[-1] == SemeString("x")
 
 
 def test_compile_mixed_literal_kinds_to_runtime_value_constants() -> None:
@@ -71,6 +77,28 @@ def test_compile_mixed_literal_kinds_to_runtime_value_constants() -> None:
 
     assert chunk.constants == [
         SemeInt(1),
+        SemeString("n"),
         SemeBool(False),
+        SemeString("ok"),
         SemeString("hi"),
+        SemeString("msg"),
+    ]
+
+
+def test_compile_nested_scope_reads_global_but_stores_local_shadow() -> None:
+    chunk = compile_source("let x = 1; { let x = 2; print(x); } print(x);")
+
+    assert [instruction.opcode.value for instruction in chunk.instructions] == [
+        "LOAD_CONST",
+        "DEFINE_GLOBAL",
+        "POP",
+        "LOAD_CONST",
+        "STORE_LOCAL",
+        "POP",
+        "LOAD_LOCAL",
+        "PRINT",
+        "POP_N",
+        "LOAD_GLOBAL",
+        "PRINT",
+        "RETURN",
     ]
