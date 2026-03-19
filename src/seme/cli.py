@@ -6,12 +6,14 @@ from io import TextIOBase
 from pathlib import Path
 
 from seme.ast import Program, Stmt
+from seme.compiler import compile_program
+from seme.bytecode_disassembler import disassemble_chunk
 from seme.diagnostics import Diagnostic
-from seme.interpreter import Interpreter
 from seme.lexer import lex
 from seme.parser import parse
-from seme.pipeline import run_check, run_execute
+from seme.pipeline import ExecutionBackend, run_check, run_execute
 from seme.typechecker import check_types
+from seme.vm import execute_chunk
 
 
 def _format_diagnostic(diag: Diagnostic) -> str:
@@ -41,7 +43,7 @@ def _cmd_check(file_path: str) -> int:
     return 0
 
 
-def _cmd_run(file_path: str) -> int:
+def _cmd_run(file_path: str, backend: ExecutionBackend) -> int:
     path = Path(file_path)
     try:
         source = path.read_text(encoding="utf-8")
@@ -49,12 +51,41 @@ def _cmd_run(file_path: str) -> int:
         print(f"RUNTIME-001 1:1 Failed to read file: {exc}", file=sys.stderr)
         return 1
 
-    stdout_text, diagnostics = run_execute(source)
+    stdout_text, diagnostics = run_execute(source, backend=backend)
     if stdout_text:
         sys.stdout.write(stdout_text)
     if diagnostics:
         _print_diagnostics(diagnostics, sys.stderr)
         return 1
+    return 0
+
+
+def _cmd_debug_bytecode(file_path: str) -> int:
+    path = Path(file_path)
+    try:
+        source = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"RUNTIME-001 1:1 Failed to read file: {exc}", file=sys.stderr)
+        return 1
+
+    tokens, lex_diags = lex(source)
+    if lex_diags:
+        _print_diagnostics(lex_diags, sys.stderr)
+        return 1
+
+    program, parse_diags = parse(tokens)
+    if parse_diags:
+        _print_diagnostics(parse_diags, sys.stderr)
+        return 1
+
+    type_diags = check_types(program)
+    if type_diags:
+        _print_diagnostics(type_diags, sys.stderr)
+        return 1
+
+    chunk = compile_program(program)
+    for line in disassemble_chunk(chunk):
+        print(line)
     return 0
 
 
@@ -65,9 +96,14 @@ def _program_for_history(statements: list[Stmt]) -> Program:
     return Program(statements=list(statements), line=first.line, column=first.column)
 
 
+def _execute_repl_program(program: Program) -> tuple[list[str], list[Diagnostic]]:
+    chunk = compile_program(program)
+    return execute_chunk(chunk)
+
+
 def repl_loop(inp: TextIOBase, out: TextIOBase, err: TextIOBase) -> int:
     history: list[Stmt] = []
-    interpreter = Interpreter()
+    committed_stdout_lines: list[str] = []
 
     while True:
         out.write("seme> ")
@@ -115,25 +151,19 @@ def repl_loop(inp: TextIOBase, out: TextIOBase, err: TextIOBase) -> int:
             _print_diagnostics(type_diags, err)
             continue
 
-        stmt_program = Program(statements=[stmt], line=stmt.line, column=stmt.column)
-        stdout_lines, runtime_diags = interpreter.execute(stmt_program)
-        for runtime_line in stdout_lines:
+        candidate_program = _program_for_history(history + [stmt])
+        stdout_lines, runtime_diags = _execute_repl_program(candidate_program)
+        new_stdout_lines = stdout_lines[len(committed_stdout_lines):]
+        for runtime_line in new_stdout_lines:
             out.write(f"{runtime_line}\n")
         out.flush()
 
         if runtime_diags:
             _print_diagnostics(runtime_diags, err)
-
-            interpreter = Interpreter()
-            if history:
-                _, rebuild_diags = interpreter.execute(_program_for_history(history))
-                if rebuild_diags:
-                    _print_diagnostics(rebuild_diags, err)
-                    history = []
-                    interpreter = Interpreter()
             continue
 
         history.append(stmt)
+        committed_stdout_lines = stdout_lines
 
 
 def _cmd_repl() -> int:
@@ -149,6 +179,17 @@ def main(argv: list[str] | None = None) -> int:
 
     run_parser = sub.add_parser("run")
     run_parser.add_argument("file")
+    run_parser.add_argument(
+        "--backend",
+        choices=("vm", "interpreter"),
+        default="vm",
+        help="Execution backend to use for seme run.",
+    )
+
+    debug_parser = sub.add_parser("debug")
+    debug_sub = debug_parser.add_subparsers(dest="debug_command", required=True)
+    bytecode_parser = debug_sub.add_parser("bytecode")
+    bytecode_parser.add_argument("file")
 
     sub.add_parser("repl")
 
@@ -157,7 +198,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check":
         return _cmd_check(args.file)
     if args.command == "run":
-        return _cmd_run(args.file)
+        return _cmd_run(args.file, backend=args.backend)
+    if args.command == "debug" and args.debug_command == "bytecode":
+        return _cmd_debug_bytecode(args.file)
     if args.command == "repl":
         return _cmd_repl()
 

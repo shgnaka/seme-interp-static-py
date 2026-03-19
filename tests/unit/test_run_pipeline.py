@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from seme.bytecode_cache import BytecodeCache
 from seme.pipeline import run_execute
 
 
@@ -67,4 +68,49 @@ def test_run_execute_print_bad_arity_in_value_context_is_single_type_error() -> 
         for d in diags
     ] == [
         ("TYPE-008", "print requires exactly one argument", 1, 14),
+    ]
+
+
+def test_run_execute_vm_and_interpreter_backends_match() -> None:
+    source = """
+let sum = 0;
+for (let i = 0; i < 4; i = i + 1) {
+  if (i < 3) {
+    sum = sum + i;
+  }
+}
+print(sum);
+""".strip()
+    vm_stdout, vm_diags = run_execute(source, backend="vm")
+    interp_stdout, interp_diags = run_execute(source, backend="interpreter")
+
+    assert vm_stdout == interp_stdout
+    assert [(d.code, d.message, d.line, d.column) for d in vm_diags] == [
+        (d.code, d.message, d.line, d.column) for d in interp_diags
+    ]
+
+
+def test_run_execute_vm_and_interpreter_match_on_string_literals() -> None:
+    source = 'let msg = "hi"; print(msg); print(msg == "hi");'
+
+    vm_stdout, vm_diags = run_execute(source, backend="vm")
+    interp_stdout, interp_diags = run_execute(source, backend="interpreter")
+
+    assert vm_stdout == "hi\ntrue\n"
+    assert vm_stdout == interp_stdout
+    assert [(d.code, d.message, d.line, d.column) for d in vm_diags] == [
+        (d.code, d.message, d.line, d.column) for d in interp_diags
+    ]
+
+
+def test_run_execute_vm_cache_matches_uncached_execution() -> None:
+    source = 'let msg = "hi"; print(msg);'
+    cache = BytecodeCache()
+
+    cached_stdout, cached_diags = run_execute(source, backend="vm", cache=cache)
+    uncached_stdout, uncached_diags = run_execute(source, backend="vm")
+
+    assert cached_stdout == uncached_stdout == "hi\n"
+    assert [(d.code, d.message, d.line, d.column) for d in cached_diags] == [
+        (d.code, d.message, d.line, d.column) for d in uncached_diags
     ]

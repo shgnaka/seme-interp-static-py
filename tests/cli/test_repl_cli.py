@@ -74,3 +74,18 @@ def test_repl_preserves_column_with_leading_spaces() -> None:
 
     assert code == 0
     assert "LEX-001 1:4" in err.getvalue()
+
+
+def test_repl_matches_run_backend_for_shadowing_and_builtin_output() -> None:
+    inp = StringIO(
+        "let x = 1;\n{ let x = 2; print(x); }\nprint(x);\n:quit\n"
+    )
+    out = StringIO()
+    err = StringIO()
+
+    code = repl_loop(inp, out, err)
+
+    assert code == 0
+    assert out.getvalue().count("2\n") == 1
+    assert out.getvalue().count("1\n") == 1
+    assert err.getvalue() == ""

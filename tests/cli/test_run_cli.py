@@ -77,3 +77,15 @@ def test_run_print_in_value_context_returns_type008(tmp_path: Path, capsys) -> N
     assert captured.out == ""
     assert "TYPE-008 1:6 print(expr) can only appear as a statement" in captured.err
     assert "TYPE-008 1:18 print(expr) can only appear as a statement" in captured.err
+
+
+def test_run_backend_interpreter_is_available_for_reference(tmp_path: Path, capsys) -> None:
+    source_file = tmp_path / "run_interpreter_backend.seme"
+    source_file.write_text("let x = 1; x = x + 2; print(x);", encoding="utf-8")
+
+    code = main(["run", "--backend", "interpreter", str(source_file)])
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert captured.out == "3\n"
+    assert captured.err == ""
